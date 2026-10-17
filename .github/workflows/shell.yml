@@ -1,0 +1,28 @@
+# Checks shell scripts: they must parse, and shellcheck must report no warnings or errors.
+name: Shell
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  shell-scripts:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Scripts parse and pass shellcheck
+        run: |
+          mapfile -t scripts < <(git ls-files '*.sh')
+          if ((${#scripts[@]} == 0)); then
+            echo "No shell scripts."
+            exit 0
+          fi
+          for script in "${scripts[@]}"; do
+            bash -n "$script"
+          done
+          shellcheck --severity=warning --external-sources "${scripts[@]}"
