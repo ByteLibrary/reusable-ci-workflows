@@ -1,0 +1,14 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  pull-request-standards:
+    uses: ./.github/workflows/pull-request-standards.yml
+  documentation:
+    uses: ./.github/workflows/documentation.yml
