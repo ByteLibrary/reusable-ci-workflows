@@ -9,6 +9,21 @@ from the organization handbook, so mistakes are caught before merging, for human
 | `documentation.yml` | Documentation links | Relative Markdown links, frontmatter `related` references and `llms.txt` entries resolve |
 | `shell.yml` | Shell scripts | Every shell script parses, and `shellcheck` reports no warnings or errors |
 
+## The rules script
+`scripts/standards.sh` holds the handbook's rules that a machine can check: Conventional Commit titles
+and commit messages, branch names, the pull request description, no co-author trailers or attribution,
+and no agent tool or vendor names. `pull-request-standards.yml` calls it in CI, and the git hooks on
+developer machines call it from the workspace clone of this repository, so both apply the same rules.
+
+```bash
+scripts/standards.sh title "feat(catalog): add work relations"
+scripts/standards.sh branch feat/12-work-relations
+scripts/standards.sh commit-message .git/COMMIT_EDITMSG
+```
+
+`scripts/test-standards.sh` tests every rule with a case that must pass and one that must fail, and
+runs in this repository's CI.
+
 ## Using the workflows
 A repository calls the workflows that apply to it from `.github/workflows/ci.yml`:
 
