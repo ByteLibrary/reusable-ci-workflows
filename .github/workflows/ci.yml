@@ -12,3 +12,13 @@ jobs:
     uses: ./.github/workflows/pull-request-standards.yml
   documentation:
     uses: ./.github/workflows/documentation.yml
+  shell:
+    uses: ./.github/workflows/shell.yml
+  rules-tests:
+    name: Rules script tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the rules script
+        run: scripts/test-standards.sh

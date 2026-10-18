@@ -18,40 +18,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check out the rules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ByteLibrary/reusable-ci-workflows
+          # This repository's own pull requests test their version of the rules.
+          ref: ${{ github.repository == 'ByteLibrary/reusable-ci-workflows' && github.event.pull_request.head.sha || 'main' }}
+          path: .standards
+          persist-credentials: false
+
       - name: Title is a Conventional Commit
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          pattern='^(feat|fix|refactor|perf|test|docs|build|ci|chore)(\([a-z0-9-]+\))?!?: [a-z0-9`].*[^.]$'
-          if [[ ! "$TITLE" =~ $pattern ]]; then
-            echo "::error::The title must be a Conventional Commit: '<type>(<scope>): <description>', lowercase, imperative, without a trailing period. Got: $TITLE"
-            exit 1
-          fi
+        run: .standards/scripts/standards.sh title "$TITLE"
 
       - name: Description follows the standard
         env:
           BODY: ${{ github.event.pull_request.body }}
-        run: |
-          body="$(tr -d '\r' <<<"$BODY")"
-          missing=()
-          grep -qiE '^closes (ByteLibrary/[A-Za-z0-9._-]+)?#[0-9]+' <<<"$body" || missing+=("a line 'Closes #<issue>'")
-          for heading in "## Why" "## What changed" "## How it was verified"; do
-            grep -qxF "$heading" <<<"$body" || missing+=("the heading '$heading'")
-          done
-          if ((${#missing[@]} > 0)); then
-            printf '::error::The description is missing %s.\n' "${missing[@]}"
-            exit 1
-          fi
+        run: .standards/scripts/standards.sh description <<<"$BODY"
 
       - name: Commits have no co-authors or attribution
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if git log --format='%B' "$BASE..$HEAD" | grep -inE '^co-authored-by:|^(🤖 )?generated (with|by) '; then
-            echo "::error::Commits must not contain co-author trailers or tool attribution."
-            exit 1
-          fi
+        run: git log --format='%B' "$BASE..$HEAD" | .standards/scripts/standards.sh attribution "A commit message"
 
       - name: No agent tool or vendor names
         env:
@@ -61,22 +51,12 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Names of AI agents, assistants and vendors that must not appear in ByteLibrary content
-          # (handbook, ADR-0017). This list is the only place where they are written down.
-          pattern='\b(claude|anthropic|openai|chatgpt|codex|copilot|gemini|windsurf)\b'
+          names() { .standards/scripts/standards.sh names "$1" <<<"$2" || found=1; }
           found=0
-          check() {
-            local matches
-            matches="$(grep -inE "$pattern" <<<"$2" || true)"
-            if [[ -n "$matches" ]]; then
-              echo "::error::$1 names a specific agent tool or vendor:"
-              head -5 <<<"$matches"
-              found=1
-            fi
-          }
-          check "The title" "$TITLE"
-          check "The description" "$BODY"
-          check "The branch name" "$BRANCH"
-          check "A commit message" "$(git log --format='%B' "$BASE..$HEAD")"
-          check "An added line" "$(git diff "$BASE...$HEAD" -- . ':(exclude).github/workflows/pull-request-standards.yml' | grep '^+' | grep -v '^+++' || true)"
+          names "The title" "$TITLE"
+          names "The description" "$BODY"
+          names "The branch name" "$BRANCH"
+          names "A commit message" "$(git log --format='%B' "$BASE..$HEAD")"
+          # The rules script is where the list of names is written down.
+          names "An added line" "$(git diff "$BASE...$HEAD" -- . ':(exclude)scripts/standards.sh' | grep '^+' | grep -v '^+++' || true)"
           exit "$found"
