@@ -1,0 +1,5 @@
+// Project settings for Zed. Formatting rules come from .editorconfig, which Zed reads natively.
+{
+  // No formatter runs on save: Zed's default formatters would reformat files differently from CI.
+  "format_on_save": "off"
+}

@@ -1,0 +1,5 @@
+{
+  "editor.formatOnSave": false,
+  // The same severity as the shell check in CI.
+  "shellcheck.customArgs": ["--severity=warning"]
+}
