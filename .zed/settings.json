@@ -1,5 +1,16 @@
 // Project settings for Zed. Formatting rules come from .editorconfig, which Zed reads natively.
 {
   // No formatter runs on save: Zed's default formatters would reformat files differently from CI.
-  "format_on_save": "off"
+  "format_on_save": "off",
+  "lsp": {
+    // Zed's built-in Bash language server reports ShellCheck findings, at the same severity as the
+    // shell check in CI.
+    "bash-language-server": {
+      "settings": {
+        "bashIde": {
+          "shellcheckArguments": "--severity=warning"
+        }
+      }
+    }
+  }
 }
