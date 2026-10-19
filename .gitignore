@@ -1,0 +1,3 @@
+# Files this repository's tools produce, which are never committed (40-conventions/repositories.md in
+# the handbook). Its documentation and scripts produce none yet; add each tool's files with the change
+# that introduces the tool.
