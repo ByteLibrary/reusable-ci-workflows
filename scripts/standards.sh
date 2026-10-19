@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The ways-of-working rules of the organization handbook that a machine can check. The pull request
+# The ways-of-working rules of the handbook that a machine can check. The pull request
 # standards workflow and the git hooks on developer machines both call this script (ADR-0024).
 #
 # Usage:
@@ -15,7 +15,7 @@ set -euo pipefail
 
 types='feat|fix|refactor|perf|test|docs|build|ci|chore'
 
-# Names of AI agents, assistants and vendors that must not appear in ByteLibrary content
+# Names of AI agents, assistants and vendors that must not appear in our content
 # (handbook, ADR-0017). This list is the only place where they are written down.
 names_pattern='\b(claude|anthropic|openai|chatgpt|codex|copilot|gemini|windsurf)\b'
 

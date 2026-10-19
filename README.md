@@ -1,7 +1,7 @@
 # reusable-ci-workflows
 
-Reusable GitHub Actions workflows that check every ByteLibrary repository. Each check enforces a rule
-from the organization handbook, so mistakes are caught before merging, for humans and agents alike.
+Reusable GitHub Actions workflows that check every repository. Each check enforces a rule from the
+handbook, so mistakes are caught before merging, for humans and agents alike.
 
 | Workflow | Job | Checks |
 |---|---|---|
@@ -47,7 +47,7 @@ jobs:
 ```
 
 `edited` makes the checks run again when a pull request's title or description changes. This
-repository's Actions access is set to the organization, which lets private ByteLibrary repositories
+repository's Actions access is set to the organization, which lets the private repositories
 call these workflows.
 
 ## Changing a workflow
