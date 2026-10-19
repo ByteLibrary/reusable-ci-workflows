@@ -1,4 +1,4 @@
-# Checks a pull request against the ways of working in the organization handbook:
+# Checks a pull request against the ways of working in the handbook:
 # title, description, commits and wording.
 name: Pull request standards
 

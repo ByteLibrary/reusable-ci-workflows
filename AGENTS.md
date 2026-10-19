@@ -1,7 +1,7 @@
 # Agent guide: reusable-ci-workflows
 
-Reusable GitHub Actions workflows called by every ByteLibrary repository. Organization rules are in the
-organization handbook (`handbook/AGENTS.md`); its strict rules apply here.
+Reusable GitHub Actions workflows called by every repository. Organization rules are in the
+handbook (`handbook/AGENTS.md`); its strict rules apply here.
 
 - A change here affects every repository. Keep checks strict about the handbook's rules and silent
   about everything else.
