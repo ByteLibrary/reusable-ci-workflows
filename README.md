@@ -46,7 +46,7 @@ A new language is a new step here, with its settings in this repository.
 ## The documentation generator
 `src/documentation` validates a repository's documentation and generates the views derived from it:
 indexes, the index of decisions, and `llms.txt`. `Shared / Lint` checks any repository with a `docs/`
-folder or a `docs.toml`; in the workspace, a repository's `mise run docs` regenerates its views.
+folder, a `docs.toml` or an `llms.txt`; in the workspace, a repository's `mise run docs` regenerates its views.
 
 By default, documents with frontmatter live in `docs/`, decisions in `docs/adr/`, and READMEs next to parts
 are listed from their first heading and paragraph. A `docs.toml` at the repository's root changes that
