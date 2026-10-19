@@ -8,13 +8,10 @@ handbook, so mistakes are caught before merging, for humans and agents alike.
 | `compliance.yml` | Shared / Compliance | The handbook's rules that apply regardless of language, one step each: the title is a Conventional Commit; the description has `Closes`, Why, What changed, How it was verified; commits have no co-author trailers or attribution; no agent tool or vendor names in the title, description, branch, commits or added lines; relative Markdown links, frontmatter `related` references and `llms.txt` entries resolve |
 | `lint.yml` | Shared / Lint | `scripts/lint.sh`: every language the repository uses, then the repository's own `mise run lint` |
 
-`pull-request-standards.yml`, `documentation.yml` and `shell.yml` remain only until every repository
-calls `compliance.yml` and `lint.yml`.
-
 ## The rules script
 `scripts/standards.sh` holds the handbook's rules that a machine can check: Conventional Commit titles
 and commit messages, branch names, the pull request description, no co-author trailers or attribution,
-and no agent tool or vendor names. `pull-request-standards.yml` calls it in CI, and the git hooks on
+and no agent tool or vendor names. `compliance.yml` calls it in CI, and the git hooks on
 developer machines call it from the workspace clone of this repository, so both apply the same rules.
 
 ```bash
