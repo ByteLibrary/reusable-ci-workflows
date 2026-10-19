@@ -32,6 +32,7 @@ in `mise.toml`:
 |---|---|---|
 | Shell | `.sh` files, and files without an extension whose first line is a shell shebang | `bash -n` and `shellcheck` |
 | Python | `.py` files | `ruff format --check` and `ruff check`, with `ruff.toml` |
+| Go | a `go.mod` at the root | `golangci-lint run` with `.golangci.yml` (lint, and gofmt and goimports formatting), using the Go version the repository pins |
 
 It then runs the repository's own `mise run lint`, if the repository defines one, for checks specific
 to it. Files marked `linguist-generated` or `linguist-vendored` in `.gitattributes` are skipped.
