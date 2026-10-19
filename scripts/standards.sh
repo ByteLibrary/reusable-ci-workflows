@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The ways-of-working rules of the handbook that a machine can check. The pull request
-# standards workflow and the git hooks on developer machines both call this script (ADR-0024).
+# The ways-of-working rules of the handbook that a machine can check. The Compliance check and the
+# git hooks on developer machines both call this script (ADR-0024).
 #
 # Usage:
 #   standards.sh title <title>          a pull request title or a commit subject
