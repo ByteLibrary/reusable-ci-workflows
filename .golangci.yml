@@ -1,0 +1,11 @@
+# The organization's Go settings, applied by scripts/lint.sh to every Go repository: golangci-lint's
+# standard linters, and gofmt and goimports formatting.
+version: "2"
+
+linters:
+  default: standard
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

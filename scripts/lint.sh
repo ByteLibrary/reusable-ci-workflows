@@ -60,6 +60,14 @@ if ((${#python_files[@]} > 0)); then
   pinned ruff check --config "$rules_dir/ruff.toml" "${python_files[@]}" || failed=1
 fi
 
+if [[ -f go.mod ]]; then
+  echo "Go"
+  # golangci-lint is pinned here, but analyzes the code with the Go version the repository pins, so it
+  # runs in the repository, with the repository's tools.
+  golangci_lint="$(cd "$rules_dir" && mise which golangci-lint)"
+  mise exec -- "$golangci_lint" run --config "$rules_dir/.golangci.yml" ./... || failed=1
+fi
+
 if [[ -d docs || -f docs.toml || -f llms.txt ]]; then
   echo "Documentation"
   pinned uv run --quiet --frozen documentation check --quiet --root "$repository_dir" || failed=1

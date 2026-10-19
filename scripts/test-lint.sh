@@ -50,6 +50,18 @@ expect pass "python: clean file" "$(repository python-clean app.py 'print("hello
 expect fail "python: not formatted" "$(repository python-format app.py "print( 'hello' )")"
 expect fail "python: lint error" "$(repository python-lint app.py $'import os\n\nprint("hello")')"
 
+# A Go repository pinning Go with mise, as every Go repository does.
+go_repository() {
+  local directory
+  directory="$(repository "$1" go.mod $'module example.com/check\n\ngo 1.27.1' mise.toml $'[tools]\ngo = "1.27.1"' main.go "$2")"
+  mise trust --quiet "$directory/mise.toml"
+  echo "$directory"
+}
+expect pass "go: clean code" "$(go_repository go-clean $'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello")\n}')"
+# An error that is never checked is a lint error (errcheck, one of the standard linters).
+expect fail "go: lint error" "$(go_repository go-lint $'package main\n\nimport "os"\n\nfunc main() {\n\tos.Remove("x")\n}')"
+expect fail "go: not formatted" "$(go_repository go-format $'package main\n\nimport "fmt"\n\nfunc main() {\nfmt.Println( "hello" )\n}')"
+
 documented() {
   local directory
   directory="$(repository "$1" README.md $'# Example\n\nWhat it is for.' docs/guide.md "$2")"
