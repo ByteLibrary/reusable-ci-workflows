@@ -1,7 +1,8 @@
 # The documentation generator
 
-Validates a repository's documentation and generates the views derived from it. How to run it is in its
-help: `uv run documentation --help`. This page is for changing it.
+Validates a repository's documentation and generates the views derived from it.
+
+How to run it is in its help, `uv run documentation --help`; this page is for changing it.
 
 ## How the parts connect
 The command reads the layout, finds every document, loads the repository's extension if it has one,
