@@ -1,0 +1,9 @@
+# Tools for the shared Lint check, at the versions every repository is linted with, and this
+# repository's own tasks.
+[tools]
+shellcheck = "0.11.0"
+ruff = "0.16.10"
+
+[tasks.test]
+description = "Run the tests of the rules script and the lint script"
+run = ["scripts/test-standards.sh", "scripts/test-lint.sh"]

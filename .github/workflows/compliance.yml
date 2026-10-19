@@ -1,0 +1,95 @@
+# The handbook's rules that apply to every repository regardless of language, as one check: the
+# ways of working for pull requests, and documentation links. Each rule is a step.
+name: Compliance
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  compliance:
+    name: Compliance
+    runs-on: ubuntu-latest
+    # Every rule runs and reports, even after another one fails.
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check out the rules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ByteLibrary/reusable-ci-workflows
+          # This repository's own pull requests test their version of the rules.
+          ref: ${{ github.repository == 'ByteLibrary/reusable-ci-workflows' && github.event.pull_request.head.sha || 'main' }}
+          path: .standards
+          persist-credentials: false
+
+      - name: Title is a Conventional Commit
+        if: ${{ !cancelled() }}
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: .standards/scripts/standards.sh title "$TITLE"
+
+      - name: Description follows the standard
+        if: ${{ !cancelled() }}
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: .standards/scripts/standards.sh description <<<"$BODY"
+
+      - name: Commits have no co-authors or attribution
+        if: ${{ !cancelled() }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git log --format='%B' "$BASE..$HEAD" | .standards/scripts/standards.sh attribution "A commit message"
+
+      - name: No agent tool or vendor names
+        if: ${{ !cancelled() }}
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          BRANCH: ${{ github.head_ref }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          names() { .standards/scripts/standards.sh names "$1" <<<"$2" || found=1; }
+          found=0
+          names "The title" "$TITLE"
+          names "The description" "$BODY"
+          names "The branch name" "$BRANCH"
+          names "A commit message" "$(git log --format='%B' "$BASE..$HEAD")"
+          # The rules script is where the list of names is written down.
+          names "An added line" "$(git diff "$BASE...$HEAD" -- . ':(exclude)scripts/standards.sh' | grep '^+' | grep -v '^+++' || true)"
+          exit "$found"
+
+      - name: Documentation links resolve
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import pathlib
+          import re
+          import subprocess
+          import sys
+
+          files = subprocess.run(["git", "ls-files", "*.md", "llms.txt"], capture_output=True, text=True, check=True).stdout.split()
+          broken = []
+          for name in files:
+              path = pathlib.Path(name)
+              text = path.read_text(encoding="utf-8")
+              targets = re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", text)
+              related = re.search(r"^related: \[(.*?)\]", text, re.MULTILINE)
+              if related:
+                  targets += [target.strip() for target in related.group(1).split(",") if target.strip()]
+              for target in targets:
+                  if re.match(r"^[a-z][a-z0-9+.-]*:", target):
+                      continue
+                  if not (path.parent / target).exists():
+                      broken.append((name, target))
+
+          for name, target in broken:
+              print(f"::error file={name}::Broken link: {target}")
+          sys.exit(1 if broken else 0)

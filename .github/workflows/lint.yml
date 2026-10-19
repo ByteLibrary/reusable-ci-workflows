@@ -1,0 +1,43 @@
+# Lints the calling repository with scripts/lint.sh: every language it uses, with the organization's
+# settings and pinned tools, then the repository's own `mise run lint`, if it has one.
+name: Lint
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check out the lint script and its tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ByteLibrary/reusable-ci-workflows
+          # This repository's own pull requests test their version of the script.
+          ref: ${{ github.repository == 'ByteLibrary/reusable-ci-workflows' && github.event.pull_request.head.sha || 'main' }}
+          path: .standards
+          persist-credentials: false
+
+      - name: Install mise and the repository's tools
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        env:
+          # Both configurations come from this pull request or from reusable-ci-workflows.
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+      - name: Install the lint tools
+        env:
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+        working-directory: .standards
+        run: mise install
+
+      - name: Lint
+        env:
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+        run: .standards/scripts/lint.sh
