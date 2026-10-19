@@ -50,6 +50,16 @@ expect pass "python: clean file" "$(repository python-clean app.py 'print("hello
 expect fail "python: not formatted" "$(repository python-format app.py "print( 'hello' )")"
 expect fail "python: lint error" "$(repository python-lint app.py $'import os\n\nprint("hello")')"
 
+documented() {
+  local directory
+  directory="$(repository "$1" README.md $'# Example\n\nWhat it is for.' docs/guide.md "$2")"
+  # The generated llms.txt, as `mise run docs` would write it.
+  (cd "$(dirname "$lint")/.." && mise exec -- uv run --quiet --frozen documentation generate --quiet --root "$directory") >/dev/null 2>&1 || true
+  echo "$directory"
+}
+expect pass "documentation: documents with frontmatter" "$(documented docs-good $'---\ntitle: Guide\nsummary: How to use it\norder: 1\nstatus: active\nrelated: []\n---\n\n# Guide')"
+expect fail "documentation: a document without frontmatter" "$(documented docs-bad $'# Guide')"
+
 own_task() {
   local directory
   directory="$(repository "$1" mise.toml "$(printf '[tasks.lint]\nrun = "%s"' "$2")")"

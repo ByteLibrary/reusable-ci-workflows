@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Lints a repository: every language it uses, with the organization's settings and the tool versions
-# pinned in this repository's mise.toml, then the repository's own `mise run lint`, if it has one.
+# pinned in this repository's mise.toml, its documentation, if it has a docs/ folder, a docs.toml or an
+# llms.txt, and then the repository's own `mise run lint`, if it has one.
 # The Lint check in CI and developers run this same script.
 #
 # Usage: lint.sh [<repository>]   the repository's folder, by default the current one
@@ -57,6 +58,11 @@ if ((${#python_files[@]} > 0)); then
   echo "Python: ${#python_files[@]} file(s)"
   pinned ruff format --check --config "$rules_dir/ruff.toml" "${python_files[@]}" || failed=1
   pinned ruff check --config "$rules_dir/ruff.toml" "${python_files[@]}" || failed=1
+fi
+
+if [[ -d docs || -f docs.toml || -f llms.txt ]]; then
+  echo "Documentation"
+  pinned uv run --quiet --frozen documentation check --quiet --root "$repository_dir" || failed=1
 fi
 
 if [[ -f mise.toml ]] && mise tasks info lint >/dev/null 2>&1; then

@@ -6,7 +6,7 @@ handbook, so mistakes are caught before merging, for humans and agents alike.
 | Workflow | Check | Checks |
 |---|---|---|
 | `compliance.yml` | Shared / Compliance | The handbook's rules that apply regardless of language, one step each: the title is a Conventional Commit; the description has `Closes`, Why, What changed, How it was verified; commits have no co-author trailers or attribution; no agent tool or vendor names in the title, description, branch, commits or added lines; relative Markdown links, frontmatter `related` references and `llms.txt` entries resolve |
-| `lint.yml` | Shared / Lint | `scripts/lint.sh`: every language the repository uses, then the repository's own `mise run lint` |
+| `lint.yml` | Shared / Lint | `scripts/lint.sh`: every language the repository uses, its documentation, then the repository's own `mise run lint` |
 
 ## The rules script
 `scripts/standards.sh` holds the handbook's rules that a machine can check: Conventional Commit titles
@@ -42,6 +42,16 @@ to it. Files marked `linguist-generated` or `linguist-vendored` in `.gitattribut
 ```
 
 A new language is a new step here, with its settings in this repository.
+
+## The documentation generator
+`src/documentation` validates a repository's documentation and generates the views derived from it:
+indexes, the index of decisions, and `llms.txt`. `Shared / Lint` checks any repository with a `docs/`
+folder, a `docs.toml` or an `llms.txt`; in the workspace, a repository's `mise run docs` regenerates its views.
+
+By default, documents with frontmatter live in `docs/`, decisions in `docs/adr/`, and READMEs next to parts
+are listed from their first heading and paragraph. A `docs.toml` at the repository's root changes that
+layout, or adds the repository's own views and checks. How it works and how to extend it:
+[src/documentation](src/documentation/README.md).
 
 ## Using the workflows
 A repository calls the workflows that apply to it from `.github/workflows/ci.yml`:

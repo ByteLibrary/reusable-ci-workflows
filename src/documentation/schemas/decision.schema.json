@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Frontmatter of every decision (ADR).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "status",
+    "date",
+    "related"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "pattern": "^ADR-[0-9]{4}: .+$"
+    },
+    "status": {
+      "type": "string",
+      "pattern": "^(proposed|accepted|deprecated|superseded by ADR-[0-9]{4})$"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "related": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
