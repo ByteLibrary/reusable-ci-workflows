@@ -8,17 +8,19 @@ permissions:
   contents: read
 
 jobs:
-  pull-request-standards:
-    uses: ./.github/workflows/pull-request-standards.yml
-  documentation:
-    uses: ./.github/workflows/documentation.yml
-  shell:
-    uses: ./.github/workflows/shell.yml
-  rules-tests:
-    name: Rules script tests
+  compliance:
+    name: Shared
+    uses: ./.github/workflows/compliance.yml
+  lint:
+    name: Shared
+    uses: ./.github/workflows/lint.yml
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out the pull request
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the rules script
-        run: scripts/test-standards.sh
+      - name: Install the pinned tools
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+      - name: Run the tests
+        run: mise run test
