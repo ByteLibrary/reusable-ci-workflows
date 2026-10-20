@@ -62,9 +62,9 @@ jobs:
           names "The description" "$BODY"
           names "The branch name" "$BRANCH"
           names "A commit message" "$(git log --format='%B' "$BASE..$HEAD")"
-          # The rules script is where the list of names is written down, and the firewall's allowlist
+          # The rules script (standards.py) is where the list of names is written down, and the firewall's allowlist
           # names providers' domains as technical data.
-          names "An added line" "$(git diff "$BASE...$HEAD" -- . ':(exclude)scripts/standards.sh' ':(exclude,glob)**/allowed-sites.txt' | grep '^+' | grep -v '^+++' || true)"
+          names "An added line" "$(git diff "$BASE...$HEAD" -- . ':(exclude)scripts/standards.py' ':(exclude,glob)**/allowed-sites.txt' | grep '^+' | grep -v '^+++' || true)"
           exit "$found"
 
       - name: Documentation links resolve

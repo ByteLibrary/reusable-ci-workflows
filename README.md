@@ -9,10 +9,12 @@ handbook, so mistakes are caught before merging, for humans and agents alike.
 | `lint.yml` | Shared / Lint | `scripts/lint.sh`: every language the repository uses, its documentation, then the repository's own `mise run lint` |
 
 ## The rules script
-`scripts/standards.sh` holds the handbook's rules that a machine can check: Conventional Commit titles
+`scripts/standards.py` holds the handbook's rules that a machine can check: Conventional Commit titles
 and commit messages, branch names, the pull request description, no co-author trailers or attribution,
 and no agent tool or vendor names. `compliance.yml` calls it in CI, and the git hooks on
 developer machines call it from the workspace clone of this repository, so both apply the same rules.
+Both call it through `scripts/standards.sh`, and it needs only Python's standard library, so it runs
+before any tool is installed.
 
 ```bash
 scripts/standards.sh title "feat(catalog): add work relations"
@@ -20,7 +22,7 @@ scripts/standards.sh branch feat/12-work-relations
 scripts/standards.sh commit-message .git/COMMIT_EDITMSG
 ```
 
-`scripts/test-standards.sh` tests every rule with a case that must pass and one that must fail, and
+`tests/test_standards.py` tests every rule with a case that must pass and one that must fail, and
 `scripts/test-lint.sh` does the same for the lint script. `mise run test` runs both, as this
 repository's `Tests` check does.
 
