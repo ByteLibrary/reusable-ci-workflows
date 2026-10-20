@@ -3,4 +3,4 @@ line-length = 110
 # No target version: scripts/lint.py passes each project's own, from the Python its mise.toml pins.
 
 [lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ANN"]
