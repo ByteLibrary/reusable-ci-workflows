@@ -32,20 +32,20 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: .standards/scripts/standards.sh title "$TITLE"
+        run: .standards/scripts/standards.py title "$TITLE"
 
       - name: Description follows the standard
         if: ${{ !cancelled() }}
         env:
           BODY: ${{ github.event.pull_request.body }}
-        run: .standards/scripts/standards.sh description <<<"$BODY"
+        run: .standards/scripts/standards.py description <<<"$BODY"
 
       - name: Commits have no co-authors or attribution
         if: ${{ !cancelled() }}
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: git log --format='%B' "$BASE..$HEAD" | .standards/scripts/standards.sh attribution "A commit message"
+        run: git log --format='%B' "$BASE..$HEAD" | .standards/scripts/standards.py attribution "A commit message"
 
       - name: No agent tool or vendor names
         if: ${{ !cancelled() }}
@@ -56,7 +56,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          names() { .standards/scripts/standards.sh names "$1" <<<"$2" || found=1; }
+          names() { .standards/scripts/standards.py names "$1" <<<"$2" || found=1; }
           found=0
           names "The title" "$TITLE"
           names "The description" "$BODY"

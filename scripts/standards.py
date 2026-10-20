@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """The ways-of-working rules of the handbook that a machine can check. The Compliance check and the git
-hooks on developer machines both call this script, through scripts/standards.sh (ADR-0024).
+hooks on developer machines both call this script (ADR-0024).
 
 Usage:
-  standards.sh title <title>          a pull request title or a commit subject
-  standards.sh commit-message <file>  a commit message, as git passes it to the commit-msg hook
-  standards.sh branch <name>          a branch name
-  standards.sh description            a pull request description, read from standard input
-  standards.sh attribution <what>     text read from standard input, described as <what>
-  standards.sh names <what>           text read from standard input, described as <what>
+  standards.py title <title>          a pull request title or a commit subject
+  standards.py commit-message <file>  a commit message, as git passes it to the commit-msg hook
+  standards.py branch <name>          a branch name
+  standards.py description            a pull request description, read from standard input
+  standards.py attribution <what>     text read from standard input, described as <what>
+  standards.py names <what>           text read from standard input, described as <what>
 
 Prints what is wrong and exits with 1 when a rule is broken, and with 2 on wrong usage. Uses only the
 standard library, so it runs on the system's Python, before any tool is installed.

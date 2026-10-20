@@ -13,13 +13,12 @@ handbook, so mistakes are caught before merging, for humans and agents alike.
 and commit messages, branch names, the pull request description, no co-author trailers or attribution,
 and no agent tool or vendor names. `compliance.yml` calls it in CI, and the git hooks on
 developer machines call it from the workspace clone of this repository, so both apply the same rules.
-Both call it through `scripts/standards.sh`, and it needs only Python's standard library, so it runs
-before any tool is installed.
+It needs only Python's standard library, so it runs before any tool is installed.
 
 ```bash
-scripts/standards.sh title "feat(catalog): add work relations"
-scripts/standards.sh branch feat/12-work-relations
-scripts/standards.sh commit-message .git/COMMIT_EDITMSG
+scripts/standards.py title "feat(catalog): add work relations"
+scripts/standards.py branch feat/12-work-relations
+scripts/standards.py commit-message .git/COMMIT_EDITMSG
 ```
 
 `tests/test_standards.py` tests every rule with a case that must pass and one that must fail, and

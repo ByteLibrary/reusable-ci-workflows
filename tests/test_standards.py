@@ -1,5 +1,5 @@
-"""The rules script, through the path the git hooks and the Compliance check call: every rule with a case
-that must pass and one that must fail."""
+"""The rules script, as the git hooks and the Compliance check run it: every rule with a case that must
+pass and one that must fail."""
 
 import importlib.util
 import os
@@ -8,9 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "standards.sh"
+SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "standards.py"
 
-spec = importlib.util.spec_from_file_location("standards", SCRIPT.with_suffix(".py"))
+spec = importlib.util.spec_from_file_location("standards", SCRIPT)
 standards = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(standards)
 # A banned name, read from the script, so the list stays in one place.
