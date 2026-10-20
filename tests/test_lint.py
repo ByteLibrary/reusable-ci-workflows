@@ -1,6 +1,6 @@
 """The lint script: which files it lints as what, and, on throwaway repositories with the pinned tools,
-each language with a case that must pass and one that must fail, skipped files, documentation and a
-repository's own lint task."""
+each language with a case that must pass and one that must fail, a language used without a pin, skipped
+files, documentation and a repository's own lint task."""
 
 import importlib.util
 import subprocess
@@ -31,6 +31,11 @@ class FilesTest(unittest.TestCase):
             "v/c.sh\0linguist-generated\0unspecified\0v/c.sh\0linguist-vendored\0true\0"
         )
         self.assertEqual(lint.skipped(output), {"gen/a.sh", "v/c.sh"})
+
+    def test_languages_used_without_a_pin(self) -> None:
+        self.assertEqual(lint.unpinned({"python", "go", "shell"}, ""), ["go", "python"])
+        self.assertEqual(lint.unpinned({"python"}, '[tools]\nuv = "0.12.23"\n'), ["python"])
+        self.assertEqual(lint.unpinned({"python", "shell"}, '[tools]\npython = "3.14.8"\n'), [])
 
     def test_languages_by_extension_or_shebang(self) -> None:
         self.assertEqual(lint.language("scripts/run.sh", ""), "shell")
@@ -82,15 +87,20 @@ class LintTest(unittest.TestCase):
             ),
         )
 
-    def test_python(self) -> None:
-        self.assertLint(True, self.repository({"app.py": 'print("hello")\n'}))
-        self.assertLint(False, self.repository({"app.py": "print( 'hello' )\n"}))
-        self.assertLint(False, self.repository({"app.py": 'import os\n\nprint("hello")\n'}))
+    def python_repository(self, code: str, pinned: bool = True) -> Path:
+        files = {"app.py": code, "mise.toml": '[tools]\npython = "3.14.8"\n' if pinned else "[tools]\n"}
+        return self.repository(files, trust=True)
 
-    def go_repository(self, code: str) -> Path:
+    def test_python(self) -> None:
+        self.assertLint(True, self.python_repository('print("hello")\n'))
+        self.assertLint(False, self.python_repository("print( 'hello' )\n"))
+        self.assertLint(False, self.python_repository('import os\n\nprint("hello")\n'))
+        self.assertLint(False, self.python_repository('print("hello")\n', pinned=False))
+
+    def go_repository(self, code: str, pinned: bool = True) -> Path:
         files = {
             "go.mod": "module example.com/check\n\ngo 1.27.1\n",
-            "mise.toml": '[tools]\ngo = "1.27.1"\n',
+            "mise.toml": '[tools]\ngo = "1.27.1"\n' if pinned else "[tools]\n",
             "main.go": code,
         }
         return self.repository(files, trust=True)
@@ -107,6 +117,12 @@ class LintTest(unittest.TestCase):
         self.assertLint(
             False,
             self.go_repository('package main\n\nimport "fmt"\n\nfunc main() {\nfmt.Println( "hello" )\n}\n'),
+        )
+        self.assertLint(
+            False,
+            self.go_repository(
+                'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello")\n}\n', pinned=False
+            ),
         )
 
     def test_documentation(self) -> None:
