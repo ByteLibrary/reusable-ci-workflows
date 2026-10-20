@@ -16,9 +16,8 @@ Example:
 import re
 import subprocess
 import sys
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 RULES = Path(__file__).resolve().parent.parent
 # The mise tool that pins each language a repository may use. Shell runs on the machine's own bash.
