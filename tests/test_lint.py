@@ -122,6 +122,12 @@ class LintTest(unittest.TestCase):
         self.assertLint(False, self.python_repository('import os\n\nprint("hello")\n'))
         self.assertLint(False, self.python_repository('print("hello")\n', pinned=False))
 
+    def test_python_type_hints(self) -> None:
+        self.assertLint(True, self.python_repository('def main() -> None:\n    print("hello")\n'))
+        # A function without type hints, and a hint that is wrong.
+        self.assertLint(False, self.python_repository('def main():\n    print("hello")\n'))
+        self.assertLint(False, self.python_repository('count: int = "one"\n'))
+
     def go_repository(self, code: str, pinned: bool = True) -> Path:
         files = {
             "go.mod": "module example.com/check\n\ngo 1.27.1\n",

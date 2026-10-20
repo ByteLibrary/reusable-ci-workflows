@@ -13,6 +13,7 @@ Example:
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -21,6 +22,9 @@ from pathlib import Path
 from typing import Any
 
 RULES = Path(__file__).resolve().parent.parent
+# mypy runs in each project's own environment, with its dependencies, so it is pinned here rather than in
+# mise.toml.
+MYPY = "mypy==2.4.0"
 # A pinned Python version, such as "3.14.8": its major and minor numbers.
 PYTHON_VERSION = re.compile(r"^(\d+)\.(\d+)")
 # A shebang that runs a shell script: bash or sh, by path or through env.
@@ -105,14 +109,46 @@ def run_quietly(command: list[str], directory: Path) -> subprocess.CompletedProc
     return subprocess.run(command, cwd=directory, capture_output=True, text=True)
 
 
-def run(command: list[str], directory: Path) -> bool:
+def run(command: list[str], directory: Path, environment: dict[str, str] | None = None) -> bool:
     """Runs a linter, showing its output; True when it found nothing."""
-    return subprocess.run(command, cwd=directory).returncode == 0
+    return subprocess.run(command, cwd=directory, env={**os.environ, **(environment or {})}).returncode == 0
 
 
 def pinned(*command: str) -> list[str]:
     """A tool at the version pinned in this repository's mise.toml (run from this repository)."""
     return ["mise", "exec", "--", *command]
+
+
+def type_check(repository: Path, target: str, files: list[str]) -> tuple[list[str], dict[str, str]]:
+    """mypy, in strict mode, for the files of one Python version: the command, and its environment.
+
+    It runs in the project's environment, so it sees the project's dependencies and their types: the
+    repository's own pyproject.toml, or for a repository without one, this repository's, which is where
+    such a repository's Python runs (the handbook's documentation extension).
+    """
+    project = repository if (repository / "pyproject.toml").exists() else RULES
+    version = f"{target[2]}.{target[3:]}"
+    command = pinned(
+        "uv",
+        "run",
+        "--quiet",
+        "--frozen",
+        "--project",
+        str(project),
+        "--with",
+        MYPY,
+        "mypy",
+        "--config-file",
+        str(RULES / "mypy.ini"),
+        "--cache-dir",
+        str(repository / ".mypy_cache"),
+        "--python-version",
+        version,
+        *files,
+    )
+    # Modules are named from the repository's root, or from src/ for a package there.
+    search = os.pathsep.join(str(path) for path in (repository / "src", repository) if path.is_dir())
+    return command, {"MYPYPATH": search}
 
 
 def lint(repository: Path) -> bool:
@@ -149,6 +185,8 @@ def lint(repository: Path) -> bool:
             options = ["--config", settings, "--target-version", target]
             passed &= run(pinned("ruff", "format", "--check", *options, *files), RULES)
             passed &= run(pinned("ruff", "check", *options, *files), RULES)
+            command, environment = type_check(repository, target, files)
+            passed &= run(command, RULES, environment)
 
     if (repository / "go.mod").exists():
         print("Go")

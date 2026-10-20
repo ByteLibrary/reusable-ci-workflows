@@ -32,7 +32,7 @@ in `mise.toml`:
 | Language | Files | Tool |
 |---|---|---|
 | Shell | `.sh` files, and files without an extension whose first line is a shell shebang | `bash -n` and `shellcheck` |
-| Python | `.py` files | `ruff format --check` and `ruff check`, with `ruff.toml`, for the Python version the file's project pins |
+| Python | `.py` files | `ruff format --check` and `ruff check`, with `ruff.toml` (including the annotation rules, `ANN`), and `mypy` in strict mode, with `mypy.ini`, in the project's environment; all for the Python version the file's project pins |
 | Go | a `go.mod` at the root | `golangci-lint run` with `.golangci.yml` (lint, and gofmt and goimports formatting), using the Go version the repository pins |
 
 Each language the repository uses, Python or Go, must be pinned under `[tools]` in its own
