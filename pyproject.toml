@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Validates documentation and generates the views derived from it."
 license = "Apache-2.0"
 requires-python = ">=3.14"
-dependencies = ["pyyaml>=6.0.2", "jsonschema>=4.23.0"]
+dependencies = [
+    "pyyaml>=6.0.2",
+    "jsonschema>=4.23.0",
+    "pydantic>=2.13.5",
+]
 
 [project.scripts]
 documentation = "documentation.cli:main"
@@ -19,3 +23,9 @@ module-name = "documentation"
 # This repository holds the organization's settings; editors use them directly.
 [tool.ruff]
 extend = "ruff.toml"
+
+[dependency-groups]
+dev = [
+    "types-jsonschema>=4.26.0.20261006",
+    "types-pyyaml>=6.0.12.20260906",
+]

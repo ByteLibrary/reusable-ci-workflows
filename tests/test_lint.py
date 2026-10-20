@@ -12,6 +12,7 @@ SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "lint.py"
 RULES = SCRIPT.parent.parent
 
 spec = importlib.util.spec_from_file_location("lint", SCRIPT)
+assert spec is not None and spec.loader is not None
 lint = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(lint)
 

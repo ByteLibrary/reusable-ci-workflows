@@ -34,7 +34,7 @@ def check_frontmatter(found: Found, report: Report) -> None:
 
 def check_order(found: Found, report: Report) -> None:
     """No two documents in a folder share a reading order."""
-    used = {}
+    used: dict[tuple[str, int | None], str] = {}
     for document in found.documents:
         key = (str(PurePosixPath(document["path"]).parent), document.get("order"))
         if key in used:

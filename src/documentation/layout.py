@@ -1,16 +1,20 @@
 """Where a repository's documentation is: the organization's convention, or what docs.toml overrides."""
 
 import tomllib
-from dataclasses import dataclass, fields
 from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from documentation.report import Report
 
 CONFIGURATION = "docs.toml"
 
 
-@dataclass
-class Layout:
+class Layout(BaseModel):
+    """The settings docs.toml may override; a format we define, so an unknown setting is an error."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     # The folder of documents with frontmatter.
     documents: str = "docs"
     # The folder of decisions (ADRs), named NNNN-short-title.md.
@@ -30,11 +34,15 @@ def load(root: Path, report: Report) -> Layout:
     if not path.exists():
         return Layout()
     try:
-        settings = tomllib.loads(path.read_text(encoding="utf-8"))
+        return Layout.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
     except tomllib.TOMLDecodeError as problem:
         report.error(f"{CONFIGURATION}: {problem}")
-        return Layout()
-    known = {field.name: field.type for field in fields(Layout)}
-    for key in sorted(settings.keys() - known.keys()):
-        report.error(f"{CONFIGURATION}: unknown setting '{key}'; known: {', '.join(known)}")
-    return Layout(**{key: value for key, value in settings.items() if key in known})
+    except ValidationError as problems:
+        for details in problems.errors():
+            where = ".".join(map(str, details["loc"]))
+            if details["type"] == "extra_forbidden":
+                known = ", ".join(Layout.model_fields)
+                report.error(f"{CONFIGURATION}: unknown setting '{where}'; known: {known}")
+            else:
+                report.error(f"{CONFIGURATION}: {where}: {details['msg']}")
+    return Layout()

@@ -11,6 +11,7 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "standards.py"
 
 spec = importlib.util.spec_from_file_location("standards", SCRIPT)
+assert spec is not None and spec.loader is not None
 standards = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(standards)
 # A banned name, read from the script, so the list stays in one place.
