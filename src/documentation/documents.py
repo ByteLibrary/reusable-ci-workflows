@@ -3,8 +3,9 @@
 import datetime
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Any, TypedDict, cast
 
 import yaml
 
@@ -15,14 +16,35 @@ from documentation.report import Report
 SECTION = re.compile(r"^\d{2}-[^/]+/")
 
 
-@dataclass
+class Document(TypedDict, total=False):
+    """A document's or decision's frontmatter, with where it was found. Its fields are what the JSON
+    Schemas in schemas/ define, checked by the rules; views and extensions read it as a dict."""
+
+    path: str
+    # Decisions only: the NNNN of the file's name.
+    number: str
+    title: str
+    summary: str
+    order: int
+    status: str
+    date: str
+    related: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class PartReadme:
+    """A plain README next to a part of the code."""
+
+    path: str
+    title: str
+    summary: str
+
+
+@dataclass(frozen=True, slots=True)
 class Found:
-    # Documents with frontmatter: {"path": …, plus the frontmatter's fields}.
-    documents: list[dict] = field(default_factory=list)
-    # Decisions with frontmatter, plus "number".
-    decisions: list[dict] = field(default_factory=list)
-    # Plain READMEs next to parts: {"path", "title", "summary"}.
-    readmes: list[dict] = field(default_factory=list)
+    documents: list[Document]
+    decisions: list[Document]
+    readmes: list[PartReadme]
 
 
 def markdown_files(root: Path) -> list[str]:
@@ -37,7 +59,7 @@ def markdown_files(root: Path) -> list[str]:
     return sorted(path for path in set(listed) if (root / path).exists())
 
 
-def decision_pattern(layout: Layout) -> re.Pattern:
+def decision_pattern(layout: Layout) -> re.Pattern[str]:
     """A decision's path: NNNN-short-title.md in the decisions folder."""
     return re.compile(rf"^{re.escape(layout.decisions)}/(\d{{4}})-[a-z0-9-]+\.md$")
 
@@ -48,7 +70,8 @@ def is_document(path: str, layout: Layout) -> bool:
     return path.startswith(f"{layout.documents}/")
 
 
-def read_frontmatter(root: Path, path: str, report: Report) -> dict:
+def read_frontmatter(root: Path, path: str, report: Report) -> dict[str, Any]:
+    """The frontmatter as YAML reads it; the rules check it against its schema afterwards."""
     text = (root / path).read_text(encoding="utf-8")
     if not text.startswith("---\n") or "\n---\n" not in text[4:]:
         report.error(f"{path}: missing frontmatter")
@@ -66,7 +89,7 @@ def readme_heading(text: str) -> tuple[str, str]:
     start = next((index for index, line in enumerate(lines) if line.startswith("# ")), None)
     if start is None:
         return "", ""
-    paragraph = []
+    paragraph: list[str] = []
     for line in lines[start + 1 :]:
         # Lists, tables, quotes, code, comments and headings are not the summary's prose.
         if not line.strip() or line.startswith(("#", "<!--", "```", "|", "- ", "* ", ">")):
@@ -78,18 +101,20 @@ def readme_heading(text: str) -> tuple[str, str]:
 
 
 def discover(root: Path, layout: Layout, report: Report) -> Found:
-    found = Found()
+    documents: list[Document] = []
+    decisions: list[Document] = []
+    readmes: list[PartReadme] = []
     decision = decision_pattern(layout)
     for path in markdown_files(root):
         match = decision.match(path)
         if match:
             meta = read_frontmatter(root, path, report)
-            found.decisions.append({"path": path, "number": match.group(1), **meta})
+            decisions.append(cast(Document, {"path": path, "number": match.group(1), **meta}))
         elif is_document(path, layout):
-            found.documents.append({"path": path, **read_frontmatter(root, path, report)})
+            documents.append(cast(Document, {"path": path, **read_frontmatter(root, path, report)}))
         elif layout.part_readmes and PurePosixPath(path).name == "README.md" and path != "README.md":
             title, summary = readme_heading((root / path).read_text(encoding="utf-8"))
             if not title:
                 report.error(f"{path}: a README next to a part starts with a '# ' heading")
-            found.readmes.append({"path": path, "title": title, "summary": summary})
-    return found
+            readmes.append(PartReadme(path, title, summary))
+    return Found(documents, decisions, readmes)

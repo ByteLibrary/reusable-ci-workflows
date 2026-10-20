@@ -2,18 +2,15 @@
 """The ways-of-working rules of the handbook that a machine can check. The Compliance check and the git
 hooks on developer machines both call this script (ADR-0024).
 
-Usage:
-  standards.py title <title>          a pull request title or a commit subject
-  standards.py commit-message <file>  a commit message, as git passes it to the commit-msg hook
-  standards.py branch <name>          a branch name
-  standards.py description            a pull request description, read from standard input
-  standards.py attribution <what>     text read from standard input, described as <what>
-  standards.py names <what>           text read from standard input, described as <what>
-
 Prints what is wrong and exits with 1 when a rule is broken, and with 2 on wrong usage. Uses only the
 standard library, so it runs on the system's Python, before any tool is installed.
+
+Examples:
+  standards.py title "feat: add the catalog"
+  git log --format=%B main..HEAD | standards.py attribution "A commit message"
 """
 
+import argparse
 import os
 import re
 import sys
@@ -50,7 +47,7 @@ class Rules:
     def __init__(self) -> None:
         self.broken = False
 
-    def report(self, message: str, details: list[str] = ()) -> None:
+    def report(self, message: str, details: tuple[str, ...] = ()) -> None:
         if os.environ.get("GITHUB_ACTIONS") == "true":
             print(f"::error::{message}")
         else:
@@ -66,12 +63,12 @@ class Rules:
                 "imperative, without a trailing period."
             )
 
-    def matching(self, pattern: re.Pattern, what: str, text: str, problem: str) -> None:
+    def matching(self, pattern: re.Pattern[str], what: str, text: str, problem: str) -> None:
         lines = [
             f"{number}:{line}" for number, line in enumerate(text.split("\n"), 1) if pattern.search(line)
         ]
         if lines:
-            self.report(f"{what} {problem}:", lines[:5])
+            self.report(f"{what} {problem}:", tuple(lines[:5]))
 
     def attribution(self, what: str, text: str) -> None:
         self.matching(ATTRIBUTION, what, text, "contains co-author trailers or tool attribution")
@@ -110,27 +107,44 @@ class Rules:
                 self.report(f"The description is missing the heading '{heading}'.")
 
 
-def usage() -> int:
-    print(__doc__.split("\n\n")[1], file=sys.stderr)
-    return 2
+def parser() -> argparse.ArgumentParser:
+    description, epilog = __doc__.split("\n\n", 1)
+    parser = argparse.ArgumentParser(
+        prog="standards.py",
+        description=description.replace("\n", " "),
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    rules = parser.add_subparsers(dest="rule", required=True, metavar="<rule>")
+    rules.add_parser("title", help="a pull request title or a commit subject").add_argument("title")
+    rules.add_parser(
+        "commit-message", help="a commit message, as git passes it to the commit-msg hook"
+    ).add_argument("file")
+    rules.add_parser("branch", help="a branch name").add_argument("name")
+    rules.add_parser("description", help="a pull request description, read from standard input")
+    for rule in ("attribution", "names"):
+        rules.add_parser(rule, help="text read from standard input, described as <what>").add_argument(
+            "what", help="what the text is, for the messages, such as 'A commit message'"
+        )
+    return parser
 
 
 def main(argv: list[str]) -> int:
+    arguments = parser().parse_args(argv)
     rules = Rules()
-    command, arguments = (argv[0], argv[1:]) if argv else ("", [])
-    if command in ("-h", "--help"):
-        print(__doc__)
-        return 0
-    if command in ("title", "commit-message", "branch") and len(arguments) == 1:
-        {"title": rules.title, "commit-message": rules.commit_message, "branch": rules.branch}[command](
-            arguments[0]
-        )
-    elif command == "description" and not arguments:
-        rules.description(sys.stdin.read())
-    elif command in ("attribution", "names") and len(arguments) == 1:
-        getattr(rules, command)(arguments[0], sys.stdin.read())
-    else:
-        return usage()
+    match arguments.rule:
+        case "title":
+            rules.title(arguments.title)
+        case "commit-message":
+            rules.commit_message(arguments.file)
+        case "branch":
+            rules.branch(arguments.name)
+        case "description":
+            rules.description(sys.stdin.read())
+        case "attribution":
+            rules.attribution(arguments.what, sys.stdin.read())
+        case "names":
+            rules.names(arguments.what, sys.stdin.read())
     return 1 if rules.broken else 0
 
 

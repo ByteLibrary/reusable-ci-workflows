@@ -5,8 +5,6 @@ the version its project pins), its documentation if it has a docs/ folder, a doc
 and then the repository's own `mise run lint`, if it has one. The Lint check in CI and developers run
 this same script.
 
-Usage: lint.py [<repository>]   the repository's folder, by default the current one
-
 Files marked linguist-generated or linguist-vendored in .gitattributes are skipped. Prints what is wrong,
 and exits with 1 when a linter finds a problem.
 
@@ -14,11 +12,13 @@ Example:
   ~/ByteLibrary/reusable-ci-workflows/scripts/lint.py ~/ByteLibrary/playbook
 """
 
+import argparse
 import re
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from typing import Any
 
 RULES = Path(__file__).resolve().parent.parent
 # A pinned Python version, such as "3.14.8": its major and minor numbers.
@@ -47,7 +47,7 @@ def language(path: str, first_line: str) -> str | None:
     return None
 
 
-def tools(folder: Path) -> dict:
+def tools(folder: Path) -> dict[str, Any]:
     """The tools pinned in a folder's mise.toml; none when it has no mise.toml."""
     mise_toml = folder / "mise.toml"
     return (
@@ -101,7 +101,7 @@ def first_line(path: Path) -> str:
         return file.readline()
 
 
-def run_quietly(command: list[str], directory: Path) -> subprocess.CompletedProcess:
+def run_quietly(command: list[str], directory: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, cwd=directory, capture_output=True, text=True)
 
 
@@ -145,7 +145,7 @@ def lint(repository: Path) -> bool:
             )
             print("\n".join(f"  {Path(file).relative_to(repository)}" for file in unpinned))
             passed = False
-        for target, files in sorted(targets.items()):
+        for target, files in sorted((target, files) for target, files in targets.items() if target):
             options = ["--config", settings, "--target-version", target]
             passed &= run(pinned("ruff", "format", "--check", *options, *files), RULES)
             passed &= run(pinned("ruff", "check", *options, *files), RULES)
@@ -183,13 +183,18 @@ def lint(repository: Path) -> bool:
 
 
 def main(argv: list[str]) -> int:
-    if argv and argv[0] in ("-h", "--help"):
-        print(__doc__)
-        return 0
-    if len(argv) > 1:
-        print(__doc__.split("\n\n")[1], file=sys.stderr)
-        return 2
-    return 0 if lint(Path(argv[0] if argv else ".").resolve()) else 1
+    description, epilog = __doc__.split("\n\n", 1)
+    parser = argparse.ArgumentParser(
+        prog="lint.py",
+        description=description.replace("\n", " "),
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "repository", nargs="?", default=".", help="the repository's folder (default: the current folder)"
+    )
+    arguments = parser.parse_args(argv)
+    return 0 if lint(Path(arguments.repository).resolve()) else 1
 
 
 if __name__ == "__main__":

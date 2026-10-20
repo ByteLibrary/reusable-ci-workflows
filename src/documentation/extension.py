@@ -13,31 +13,37 @@ from pathlib import Path
 
 from documentation.layout import Layout
 from documentation.report import Report
+from documentation.views import Views
+
+# The function an extension calls to report a problem.
+Error = Callable[[str], None]
+# The arguments every view is called with, by name.
+Context = dict[str, object]
 
 
-def no_data(root: Path, error: Callable[[str], None]) -> dict:
+def no_data(root: Path, error: Error) -> Context:
     return {}
 
 
-def no_checks(context: dict, error: Callable[[str], None]) -> None:
+def no_checks(context: Context, error: Error) -> None:
     return None
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Extension:
-    views: dict = field(default_factory=dict)
-    load: Callable[[Path, Callable[[str], None]], dict] = no_data
-    validate: Callable[[dict, Callable[[str], None]], None] = no_checks
+    views: Views = field(default_factory=dict)
+    load: Callable[[Path, Error], Context] = no_data
+    validate: Callable[[Context, Error], None] = no_checks
 
 
 def load_extension(root: Path, layout: Layout, report: Report) -> Extension:
     if not layout.extension:
         return Extension()
     path = root / layout.extension
-    if not path.exists():
+    spec = importlib.util.spec_from_file_location("documentation_extension", path)
+    if not path.exists() or spec is None or spec.loader is None:
         report.error(f"docs.toml: extension {layout.extension} does not exist")
         return Extension()
-    spec = importlib.util.spec_from_file_location("documentation_extension", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return Extension(

@@ -17,7 +17,7 @@ from pathlib import Path
 
 from documentation import rules
 from documentation.documents import discover
-from documentation.extension import load_extension
+from documentation.extension import Context, load_extension
 from documentation.generate import generated_files
 from documentation.layout import load
 from documentation.report import Report
@@ -29,7 +29,7 @@ def build(root: Path, report: Report) -> dict[str, str]:
     layout = load(root, report)
     found = discover(root, layout, report)
     extension = load_extension(root, layout, report)
-    context = {
+    context: Context = {
         "root": root,
         "documents": found.documents,
         "decisions": found.decisions,

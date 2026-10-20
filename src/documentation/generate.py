@@ -2,27 +2,27 @@
 
 import pathlib
 import re
-from collections.abc import Callable
 
-from documentation.documents import Found
+from documentation.documents import Document, Found
+from documentation.extension import Context
 from documentation.layout import Layout
 from documentation.report import Report
 from documentation.rules import sections
+from documentation.views import Views
 
 # A marker that starts a generated view: its name, an optional argument, then any text.
 BEGIN = re.compile(r"^<!-- BEGIN GENERATED (?P<view>[a-z-]+)(?::(?P<arg>\S+))?(?: [^\n]*)? ?-->$")
 END = "<!-- END GENERATED -->"
 
-Views = dict[str, tuple[Callable[..., str], str]]
 
-
-def render_markers(path: str, text: str, views: Views, context: dict, report: Report) -> str:
+def render_markers(path: str, text: str, views: Views, context: Context, report: Report) -> str:
     """Re-renders every generated view in a file.
 
     Scanned line by line: a BEGIN marker counts only outside fenced code blocks (markers inside them are
     examples), and everything up to the matching END marker is replaced, code blocks included.
     """
-    lines, output, index, in_fence = text.split("\n"), [], 0, False
+    lines, index, in_fence = text.split("\n"), 0, False
+    output: list[str] = []
     while index < len(lines):
         line = lines[index]
         begin = None if in_fence else BEGIN.match(line)
@@ -50,7 +50,7 @@ def render_markers(path: str, text: str, views: Views, context: dict, report: Re
     return "\n".join(output)
 
 
-def reading_order(document: dict) -> tuple:
+def reading_order(document: Document) -> tuple[int, str, int, str]:
     path = pathlib.PurePosixPath(document["path"])
     return (document["path"].count("/"), str(path.parent), document.get("order", 0), document["path"])
 
@@ -92,8 +92,8 @@ def render_llms(root: pathlib.Path, layout: Layout, found: Found) -> str:
             (
                 "Parts",
                 [
-                    f"- [{readme['title']}]({readme['path']}): {readme['summary']}"
-                    for readme in sorted(found.readmes, key=lambda readme: readme["path"])
+                    f"- [{readme.title}]({readme.path}): {readme.summary}"
+                    for readme in sorted(found.readmes, key=lambda readme: readme.path)
                 ],
             ),
         ]
@@ -108,11 +108,15 @@ def render_llms(root: pathlib.Path, layout: Layout, found: Found) -> str:
 
 
 def generated_files(
-    root: pathlib.Path, layout: Layout, found: Found, views: Views, context: dict, report: Report
-):
+    root: pathlib.Path, layout: Layout, found: Found, views: Views, context: Context, report: Report
+) -> dict[str, str]:
     """Every generated file, as its new text: the files with markers, and llms.txt."""
-    files = {}
-    paths = ["README.md"] + [item["path"] for item in found.documents + found.decisions + found.readmes]
+    files: dict[str, str] = {}
+    paths = [
+        "README.md",
+        *(item["path"] for item in found.documents + found.decisions),
+        *(readme.path for readme in found.readmes),
+    ]
     for path in paths:
         if not (root / path).exists():
             continue
