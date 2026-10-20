@@ -1,4 +1,4 @@
-# The organization's Python settings, applied by scripts/lint.sh to every repository.
+# The organization's Python settings, applied by scripts/lint.py to every repository.
 line-length = 110
 
 [lint]

@@ -6,7 +6,7 @@ handbook, so mistakes are caught before merging, for humans and agents alike.
 | Workflow | Check | Checks |
 |---|---|---|
 | `compliance.yml` | Shared / Compliance | The handbook's rules that apply regardless of language, one step each: the title is a Conventional Commit; the description has `Closes`, Why, What changed, How it was verified; commits have no co-author trailers or attribution; no agent tool or vendor names in the title, description, branch, commits or added lines; relative Markdown links, frontmatter `related` references and `llms.txt` entries resolve |
-| `lint.yml` | Shared / Lint | `scripts/lint.sh`: every language the repository uses, its documentation, then the repository's own `mise run lint` |
+| `lint.yml` | Shared / Lint | `scripts/lint.py`: every language the repository uses, its documentation, then the repository's own `mise run lint` |
 
 ## The rules script
 `scripts/standards.py` holds the handbook's rules that a machine can check: Conventional Commit titles
@@ -22,11 +22,11 @@ scripts/standards.py commit-message .git/COMMIT_EDITMSG
 ```
 
 `tests/test_standards.py` tests every rule with a case that must pass and one that must fail, and
-`scripts/test-lint.sh` does the same for the lint script. `mise run test` runs both, as this
+`tests/test_lint.py` does the same for the lint script. `mise run test` runs both, as this
 repository's `Tests` check does.
 
 ## The lint script
-`scripts/lint.sh` lints a repository with the organization's settings and the tool versions pinned
+`scripts/lint.py` lints a repository with the organization's settings and the tool versions pinned
 in `mise.toml`:
 
 | Language | Files | Tool |
@@ -40,7 +40,7 @@ to it. Files marked `linguist-generated` or `linguist-vendored` in `.gitattribut
 `lint.yml` runs it in CI, and it runs the same way locally from the workspace clone:
 
 ```bash
-~/ByteLibrary/reusable-ci-workflows/scripts/lint.sh ~/ByteLibrary/playbook
+~/ByteLibrary/reusable-ci-workflows/scripts/lint.py ~/ByteLibrary/playbook
 ```
 
 A new language is a new step here, with its settings in this repository.
