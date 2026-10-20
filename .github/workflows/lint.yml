@@ -1,4 +1,4 @@
-# Lints the calling repository with scripts/lint.sh: every language it uses, with the organization's
+# Lints the calling repository with scripts/lint.py: every language it uses, with the organization's
 # settings and pinned tools, then the repository's own `mise run lint`, if it has one.
 name: Lint
 
@@ -40,4 +40,4 @@ jobs:
       - name: Lint
         env:
           MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
-        run: .standards/scripts/lint.sh
+        run: .standards/scripts/lint.py
