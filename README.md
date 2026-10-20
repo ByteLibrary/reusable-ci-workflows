@@ -32,11 +32,14 @@ in `mise.toml`:
 | Language | Files | Tool |
 |---|---|---|
 | Shell | `.sh` files, and files without an extension whose first line is a shell shebang | `bash -n` and `shellcheck` |
-| Python | `.py` files | `ruff format --check` and `ruff check`, with `ruff.toml` |
+| Python | `.py` files | `ruff format --check` and `ruff check`, with `ruff.toml`, for the Python version the file's project pins |
 | Go | a `go.mod` at the root | `golangci-lint run` with `.golangci.yml` (lint, and gofmt and goimports formatting), using the Go version the repository pins |
 
 Each language the repository uses, Python or Go, must be pinned under `[tools]` in its own
 `mise.toml`, so it never runs on whatever version a machine has; the script names any missing pin.
+Python may be pinned per folder: each Python file is linted and formatted for the version pinned by the
+nearest `mise.toml` that pins Python, from its folder up to the repository's root, so projects in one
+repository may use different versions.
 It then runs the repository's own `mise run lint`, if the repository defines one, for checks specific
 to it. Files marked `linguist-generated` or `linguist-vendored` in `.gitattributes` are skipped.
 `lint.yml` runs it in CI, and it runs the same way locally from the workspace clone:
