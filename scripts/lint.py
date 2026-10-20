@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Lints a repository: that it pins each language it uses in its own mise.toml, every language it uses,
-with the organization's settings and the tool versions pinned in this repository's mise.toml, its
-documentation if it has a docs/ folder, a docs.toml or an llms.txt, and then the repository's own
-`mise run lint`, if it has one. The Lint check in CI and developers run this same script.
+with the organization's settings and the tool versions pinned in this repository's mise.toml (Python for
+the version its project pins), its documentation if it has a docs/ folder, a docs.toml or an llms.txt,
+and then the repository's own `mise run lint`, if it has one. The Lint check in CI and developers run
+this same script.
 
 Usage: lint.py [<repository>]   the repository's folder, by default the current one
 
@@ -20,8 +21,8 @@ import tomllib
 from pathlib import Path
 
 RULES = Path(__file__).resolve().parent.parent
-# The mise tool that pins each language a repository may use. Shell runs on the machine's own bash.
-PINS = {"python": "python", "go": "go"}
+# A pinned Python version, such as "3.14.8": its major and minor numbers.
+PYTHON_VERSION = re.compile(r"^(\d+)\.(\d+)")
 # A shebang that runs a shell script: bash or sh, by path or through env.
 SHELL_SHEBANG = re.compile(r"^#!.*\b(ba)?sh\b")
 
@@ -46,10 +47,39 @@ def language(path: str, first_line: str) -> str | None:
     return None
 
 
-def unpinned(languages: set[str], mise_toml: str) -> list[str]:
-    """The languages used without a pin in the repository's mise.toml (its text, empty when it has none)."""
-    tools = tomllib.loads(mise_toml).get("tools", {})
-    return sorted(PINS[name] for name in languages if name in PINS and PINS[name] not in tools)
+def tools(folder: Path) -> dict:
+    """The tools pinned in a folder's mise.toml; none when it has no mise.toml."""
+    mise_toml = folder / "mise.toml"
+    return (
+        tomllib.loads(mise_toml.read_text(encoding="utf-8")).get("tools", {}) if mise_toml.is_file() else {}
+    )
+
+
+def python_target(pin: str | list[str]) -> str | None:
+    """The ruff target for a pinned Python version, such as py314 for "3.14.8"; None when the pin is not a
+    version."""
+    match = PYTHON_VERSION.match(str(pin[0] if isinstance(pin, list) else pin))
+    return f"py{match.group(1)}{match.group(2)}" if match else None
+
+
+def python_targets(repository: Path, files: list[str]) -> dict[str | None, list[str]]:
+    """The Python files by the ruff target of the version that the nearest mise.toml pinning Python pins,
+    from each file's folder up to the repository's root. Files without a pin are under None."""
+    by_folder: dict[Path, str | None] = {}
+
+    def target(folder: Path) -> str | None:
+        if folder not in by_folder:
+            pin = tools(folder).get("python")
+            if pin:
+                by_folder[folder] = python_target(pin)
+            else:
+                by_folder[folder] = None if folder == repository else target(folder.parent)
+        return by_folder[folder]
+
+    grouped: dict[str | None, list[str]] = {}
+    for file in files:
+        grouped.setdefault(target(Path(file).parent), []).append(file)
+    return grouped
 
 
 def tracked_files(repository: Path) -> list[str]:
@@ -94,10 +124,8 @@ def lint(repository: Path) -> bool:
             by_language.setdefault(found, []).append(str(repository / path))
     passed = True
 
-    used = set(by_language) | ({"go"} if (repository / "go.mod").exists() else set())
-    mise_toml = repository / "mise.toml"
-    for tool in unpinned(used, mise_toml.read_text(encoding="utf-8") if mise_toml.exists() else ""):
-        print(f'error: {tool} is used but not pinned: add {tool} = "<version>" under [tools] in mise.toml')
+    if (repository / "go.mod").exists() and "go" not in tools(repository):
+        print('error: go is used but not pinned: add go = "<version>" under [tools] in mise.toml')
         passed = False
 
     if scripts := by_language.get("shell"):
@@ -109,8 +137,18 @@ def lint(repository: Path) -> bool:
     if python := by_language.get("python"):
         print(f"Python: {len(python)} file(s)")
         settings = str(RULES / "ruff.toml")
-        passed &= run(pinned("ruff", "format", "--check", "--config", settings, *python), RULES)
-        passed &= run(pinned("ruff", "check", "--config", settings, *python), RULES)
+        targets = python_targets(repository, python)
+        if unpinned := targets.pop(None, []):
+            print(
+                'error: python is used but not pinned: add python = "<version>" under [tools] in a mise.toml '
+                "in the folder of these files or above:"
+            )
+            print("\n".join(f"  {Path(file).relative_to(repository)}" for file in unpinned))
+            passed = False
+        for target, files in sorted(targets.items()):
+            options = ["--config", settings, "--target-version", target]
+            passed &= run(pinned("ruff", "format", "--check", *options, *files), RULES)
+            passed &= run(pinned("ruff", "check", *options, *files), RULES)
 
     if (repository / "go.mod").exists():
         print("Go")

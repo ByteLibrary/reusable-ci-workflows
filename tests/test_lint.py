@@ -32,10 +32,26 @@ class FilesTest(unittest.TestCase):
         )
         self.assertEqual(lint.skipped(output), {"gen/a.sh", "v/c.sh"})
 
-    def test_languages_used_without_a_pin(self) -> None:
-        self.assertEqual(lint.unpinned({"python", "go", "shell"}, ""), ["go", "python"])
-        self.assertEqual(lint.unpinned({"python"}, '[tools]\nuv = "0.12.23"\n'), ["python"])
-        self.assertEqual(lint.unpinned({"python", "shell"}, '[tools]\npython = "3.14.8"\n'), [])
+    def test_python_targets_from_the_nearest_pin(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        pins = {"": '[tools]\npython = "3.14.8"\n', "old": '[tools]\npython = "3.12"\n', "other": "[tools]\n"}
+        for folder, text in pins.items():
+            (root / folder).mkdir(exist_ok=True)
+            (root / folder / "mise.toml").write_text(text)
+        files = [str(root / path) for path in ("a.py", "old/b.py", "old/deep/c.py", "other/d.py")]
+        self.assertEqual(
+            lint.python_targets(root, files),
+            {"py314": [files[0], files[3]], "py312": [files[1], files[2]]},
+        )
+        (root / "mise.toml").write_text("[tools]\n")
+        self.assertEqual(lint.python_targets(root, files)[None], [files[0], files[3]])
+
+    def test_python_target_of_a_pin(self) -> None:
+        self.assertEqual(lint.python_target("3.14.8"), "py314")
+        self.assertEqual(lint.python_target(["3.12", "3.14"]), "py312")
+        self.assertIsNone(lint.python_target("latest"))
 
     def test_languages_by_extension_or_shebang(self) -> None:
         self.assertEqual(lint.language("scripts/run.sh", ""), "shell")
@@ -90,6 +106,14 @@ class LintTest(unittest.TestCase):
     def python_repository(self, code: str, pinned: bool = True) -> Path:
         files = {"app.py": code, "mise.toml": '[tools]\npython = "3.14.8"\n' if pinned else "[tools]\n"}
         return self.repository(files, trust=True)
+
+    def test_python_folders_with_different_pins(self) -> None:
+        # The 3.14 form of an exception group is formatted for a 3.14 project, and left alone for 3.12.
+        code = 'try:\n    print("hello")\nexcept ValueError, TypeError:\n    print("failed")\n'
+        files = {"new/mise.toml": '[tools]\npython = "3.14.8"\n', "new/app.py": code}
+        self.assertLint(True, self.repository(files))
+        old = {"old/mise.toml": '[tools]\npython = "3.12"\n', "old/app.py": code}
+        self.assertLint(False, self.repository({**files, **old}))
 
     def test_python(self) -> None:
         self.assertLint(True, self.python_repository('print("hello")\n'))
