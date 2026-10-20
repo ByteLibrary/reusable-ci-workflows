@@ -1,9 +1,8 @@
 """Where a repository's documentation is: the organization's convention, or what docs.toml overrides."""
 
+import tomllib
 from dataclasses import dataclass, fields
 from pathlib import Path
-
-import tomllib
 
 from documentation.report import Report
 

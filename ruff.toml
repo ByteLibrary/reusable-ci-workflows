@@ -1,5 +1,7 @@
 # The organization's Python settings, applied by scripts/lint.py to every repository.
 line-length = 110
+# The Python version every repository pins, so the rules, import sorting and formatting match it.
+target-version = "py314"
 
 [lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
