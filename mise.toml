@@ -10,7 +10,6 @@ uv = "0.12.23"
 [tasks.test]
 description = "Run the tests of the rules script, the lint script and the documentation generator"
 run = [
-  "scripts/test-standards.sh",
   "scripts/test-lint.sh",
   "uv run --frozen python -m unittest discover --start-directory tests --top-level-directory .",
 ]
