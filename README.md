@@ -35,6 +35,8 @@ in `mise.toml`:
 | Python | `.py` files | `ruff format --check` and `ruff check`, with `ruff.toml` |
 | Go | a `go.mod` at the root | `golangci-lint run` with `.golangci.yml` (lint, and gofmt and goimports formatting), using the Go version the repository pins |
 
+Each language the repository uses, Python or Go, must be pinned under `[tools]` in its own
+`mise.toml`, so it never runs on whatever version a machine has; the script names any missing pin.
 It then runs the repository's own `mise run lint`, if the repository defines one, for checks specific
 to it. Files marked `linguist-generated` or `linguist-vendored` in `.gitattributes` are skipped.
 `lint.yml` runs it in CI, and it runs the same way locally from the workspace clone:

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Lints a repository: every language it uses, with the organization's settings and the tool versions
-pinned in this repository's mise.toml, its documentation if it has a docs/ folder, a docs.toml or an
-llms.txt, and then the repository's own `mise run lint`, if it has one. The Lint check in CI and
-developers run this same script.
+"""Lints a repository: that it pins each language it uses in its own mise.toml, every language it uses,
+with the organization's settings and the tool versions pinned in this repository's mise.toml, its
+documentation if it has a docs/ folder, a docs.toml or an llms.txt, and then the repository's own
+`mise run lint`, if it has one. The Lint check in CI and developers run this same script.
 
 Usage: lint.py [<repository>]   the repository's folder, by default the current one
 
@@ -18,7 +18,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import tomllib
+
 RULES = Path(__file__).resolve().parent.parent
+# The mise tool that pins each language a repository may use. Shell runs on the machine's own bash.
+PINS = {"python": "python", "go": "go"}
 # A shebang that runs a shell script: bash or sh, by path or through env.
 SHELL_SHEBANG = re.compile(r"^#!.*\b(ba)?sh\b")
 
@@ -41,6 +45,12 @@ def language(path: str, first_line: str) -> str | None:
     if "." not in name and SHELL_SHEBANG.match(first_line):
         return "shell"
     return None
+
+
+def unpinned(languages: set[str], mise_toml: str) -> list[str]:
+    """The languages used without a pin in the repository's mise.toml (its text, empty when it has none)."""
+    tools = tomllib.loads(mise_toml).get("tools", {})
+    return sorted(PINS[name] for name in languages if name in PINS and PINS[name] not in tools)
 
 
 def tracked_files(repository: Path) -> list[str]:
@@ -84,6 +94,12 @@ def lint(repository: Path) -> bool:
         if found:
             by_language.setdefault(found, []).append(str(repository / path))
     passed = True
+
+    used = set(by_language) | ({"go"} if (repository / "go.mod").exists() else set())
+    mise_toml = repository / "mise.toml"
+    for tool in unpinned(used, mise_toml.read_text(encoding="utf-8") if mise_toml.exists() else ""):
+        print(f'error: {tool} is used but not pinned: add {tool} = "<version>" under [tools] in mise.toml')
+        passed = False
 
     if scripts := by_language.get("shell"):
         print(f"Shell: {len(scripts)} script(s)")
