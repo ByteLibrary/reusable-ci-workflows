@@ -28,24 +28,37 @@ jobs:
           path: .standards
           persist-credentials: false
 
+      - name: Install mise
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          install: false
+
+      - name: Install the Python the rules pin
+        env:
+          MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}/.standards
+        working-directory: .standards
+        run: |
+          mise install python
+          echo "RULES_PYTHON=$(mise which python)" >>"$GITHUB_ENV"
+
       - name: Title is a Conventional Commit
         if: ${{ !cancelled() }}
         env:
           TITLE: ${{ github.event.pull_request.title }}
-        run: .standards/scripts/standards.py title "$TITLE"
+        run: '"$RULES_PYTHON" .standards/scripts/standards.py title "$TITLE"'
 
       - name: Description follows the standard
         if: ${{ !cancelled() }}
         env:
           BODY: ${{ github.event.pull_request.body }}
-        run: .standards/scripts/standards.py description <<<"$BODY"
+        run: '"$RULES_PYTHON" .standards/scripts/standards.py description <<<"$BODY"'
 
       - name: Commits have no co-authors or attribution
         if: ${{ !cancelled() }}
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
-        run: git log --format='%B' "$BASE..$HEAD" | .standards/scripts/standards.py attribution "A commit message"
+        run: git log --format='%B' "$BASE..$HEAD" | "$RULES_PYTHON" .standards/scripts/standards.py attribution "A commit message"
 
       - name: No agent tool or vendor names
         if: ${{ !cancelled() }}
@@ -56,7 +69,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          names() { .standards/scripts/standards.py names "$1" <<<"$2" || found=1; }
+          names() { "$RULES_PYTHON" .standards/scripts/standards.py names "$1" <<<"$2" || found=1; }
           found=0
           names "The title" "$TITLE"
           names "The description" "$BODY"
@@ -69,8 +82,8 @@ jobs:
 
       - name: Documentation links resolve
         if: ${{ !cancelled() }}
-        shell: python
         run: |
+          "$RULES_PYTHON" - <<'PYTHON'
           import pathlib
           import re
           import subprocess
@@ -94,3 +107,4 @@ jobs:
           for name, target in broken:
               print(f"::error file={name}::Broken link: {target}")
           sys.exit(1 if broken else 0)
+          PYTHON
