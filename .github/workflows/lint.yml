@@ -35,9 +35,12 @@ jobs:
         env:
           MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
         working-directory: .standards
-        run: mise install
+        run: |
+          mise install
+          echo "RULES_PYTHON=$(mise which python)" >>"$GITHUB_ENV"
 
       - name: Lint
         env:
           MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
-        run: .standards/scripts/lint.py
+        # On the Python this repository pins, whatever the calling repository uses.
+        run: '"$RULES_PYTHON" .standards/scripts/lint.py'
