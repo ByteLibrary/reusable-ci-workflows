@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.test_documentation import STATUSES
+
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "lint.py"
 RULES = SCRIPT.parent.parent
 
@@ -157,7 +159,11 @@ class LintTest(unittest.TestCase):
         )
 
     def test_documentation(self) -> None:
-        good = self.repository({"README.md": "# Example\n\nWhat it is for.\n", "docs/guide.md": FRONTMATTER})
+        # The repository is its own handbook, as the handbook is, so it defines the statuses itself.
+        handbook = {"docs.toml": 'handbook = "."\n', "data/document-statuses.yaml": STATUSES}
+        good = self.repository(
+            {"README.md": "# Example\n\nWhat it is for.\n", "docs/guide.md": FRONTMATTER, **handbook}
+        )
         generate = [
             "uv",
             "run",
@@ -173,7 +179,9 @@ class LintTest(unittest.TestCase):
         self.assertLint(True, good)
         self.assertLint(
             False,
-            self.repository({"README.md": "# Example\n\nWhat it is for.\n", "docs/guide.md": "# Guide\n"}),
+            self.repository(
+                {"README.md": "# Example\n\nWhat it is for.\n", "docs/guide.md": "# Guide\n", **handbook}
+            ),
         )
 
     def test_own_lint_task(self) -> None:

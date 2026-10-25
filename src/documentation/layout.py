@@ -26,6 +26,9 @@ class Layout(BaseModel):
     part_readmes: bool = True
     # A Python file with the repository's own views and checks, relative to the root.
     extension: str | None = None
+    # The handbook, which defines the statuses, relative to the root: by default its workspace clone next
+    # to the repository.
+    handbook: str = "../handbook"
 
 
 def load(root: Path, report: Report) -> Layout:

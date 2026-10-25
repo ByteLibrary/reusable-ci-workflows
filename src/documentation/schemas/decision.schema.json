@@ -16,7 +16,7 @@
     },
     "status": {
       "type": "string",
-      "pattern": "^(proposed|accepted|deprecated|superseded by ADR-[0-9]{4})$"
+      "description": "One of the handbook's statuses for this kind (data/document-statuses.yaml), checked by the rules."
     },
     "date": {
       "type": "string",

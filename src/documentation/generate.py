@@ -1,18 +1,55 @@
-"""Rendering: the generated views inside documents, and llms.txt."""
+"""Rendering: the generated views inside documents, the notices of their statuses, and llms.txt."""
 
 import pathlib
 import re
+from collections.abc import Mapping
 
 from documentation.documents import Document, Found
 from documentation.extension import Context
 from documentation.layout import Layout
 from documentation.report import Report
 from documentation.rules import sections
-from documentation.views import Views
+from documentation.views import Views, summary
 
 # A marker that starts a generated view: its name, an optional argument, then any text.
 BEGIN = re.compile(r"^<!-- BEGIN GENERATED (?P<view>[a-z-]+)(?::(?P<arg>\S+))?(?: [^\n]*)? ?-->$")
 END = "<!-- END GENERATED -->"
+# The view a status's notice is written with, under a document's first heading.
+NOTICE = "notice"
+
+
+def outside_code(lines: list[str]) -> list[int]:
+    """The indexes of the lines that are not inside fenced code blocks, nor in the frontmatter."""
+    indexes, in_fence = [], False
+    start = lines.index("---", 1) + 1 if lines and lines[0] == "---" and "---" in lines[1:] else 0
+    for index in range(start, len(lines)):
+        if lines[index].startswith("```"):
+            in_fence = not in_fence
+        elif not in_fence:
+            indexes.append(index)
+    return indexes
+
+
+def is_notice(line: str) -> bool:
+    marker = BEGIN.match(line)
+    return marker is not None and marker.group("view") == NOTICE
+
+
+def place_notice(path: str, text: str, notice: str | None, report: Report) -> str:
+    """The text with its status's notice under its first heading, or without one if the status has none."""
+    lines = text.split("\n")
+    begin = next((index for index in outside_code(lines) if is_notice(lines[index])), None)
+    if begin is not None and END in lines[begin:]:
+        end = lines.index(END, begin)
+        del lines[begin - 1 if begin and not lines[begin - 1] else begin : end + 1]
+    if notice is None:
+        return "\n".join(lines)
+    heading = next((index for index in outside_code(lines) if lines[index].startswith("# ")), None)
+    if heading is None:
+        report.error(f"{path}: its status shows a notice, which goes under a '# ' heading it does not have")
+        return text
+    lines[heading + 1 : heading + 1] = ["", f"<!-- BEGIN GENERATED {NOTICE} -->", END]
+    return "\n".join(lines)
 
 
 def render_markers(path: str, text: str, views: Views, context: Context, report: Report) -> str:
@@ -55,7 +92,7 @@ def reading_order(document: Document) -> tuple[int, str, int, str]:
     return (document["path"].count("/"), str(path.parent), document.get("order", 0), document["path"])
 
 
-def render_llms(root: pathlib.Path, layout: Layout, found: Found) -> str:
+def render_llms(root: pathlib.Path, layout: Layout, found: Found, notices: Mapping[str, str]) -> str:
     """llms.txt: the README's title and first paragraph, then every document, decision and part."""
     readme = (root / "README.md").read_text(encoding="utf-8").split("\n\n")
     lines = [readme[0].strip(), ""]
@@ -73,7 +110,7 @@ def render_llms(root: pathlib.Path, layout: Layout, found: Found) -> str:
                 document for document in found.documents if document["path"].startswith(section + "/")
             ]
             lines += [
-                f"- [{document['title']}]({document['path']}): {document['summary']}"
+                f"- [{document['title']}]({document['path']}): {summary(document, notices)}"
                 for document in sorted(in_section, key=reading_order)
             ]
             if layout.decisions.split("/")[0] == section:
@@ -84,7 +121,7 @@ def render_llms(root: pathlib.Path, layout: Layout, found: Found) -> str:
             (
                 "Documentation",
                 [
-                    f"- [{document['title']}]({document['path']}): {document['summary']}"
+                    f"- [{document['title']}]({document['path']}): {summary(document, notices)}"
                     for document in sorted(found.documents, key=reading_order)
                 ],
             ),
@@ -108,10 +145,17 @@ def render_llms(root: pathlib.Path, layout: Layout, found: Found) -> str:
 
 
 def generated_files(
-    root: pathlib.Path, layout: Layout, found: Found, views: Views, context: Context, report: Report
+    root: pathlib.Path,
+    layout: Layout,
+    found: Found,
+    views: Views,
+    context: Context,
+    notices: Mapping[str, str],
+    report: Report,
 ) -> dict[str, str]:
-    """Every generated file, as its new text: the files with markers, and llms.txt."""
+    """Every generated file, as its new text: the files with markers or a notice, and llms.txt."""
     files: dict[str, str] = {}
+    documented = {item["path"] for item in found.documents + found.decisions}
     paths = [
         "README.md",
         *(item["path"] for item in found.documents + found.decisions),
@@ -121,8 +165,10 @@ def generated_files(
         if not (root / path).exists():
             continue
         text = (root / path).read_text(encoding="utf-8")
-        if "BEGIN GENERATED" in text:
+        if path in documented:
+            text = place_notice(path, text, notices.get(path), report)
+        if "BEGIN GENERATED" in text or text != (root / path).read_text(encoding="utf-8"):
             files[path] = render_markers(path, text, views, context, report)
     if (root / "README.md").exists():
-        files["llms.txt"] = render_llms(root, layout, found)
+        files["llms.txt"] = render_llms(root, layout, found, notices)
     return files

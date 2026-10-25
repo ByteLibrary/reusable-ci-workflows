@@ -1,18 +1,36 @@
-"""The documentation generator, run on throwaway repositories in both layouts."""
+"""The documentation generator, run on throwaway repositories in both layouts, each with a handbook next
+to it that defines the statuses."""
 
 import contextlib
 import io
+import os
 import subprocess
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from documentation import cli
+from documentation.statuses import HANDBOOK
+
+# The handbook's table of statuses, as the tests' handbook defines it.
+STATUSES = """\
+- {code: draft, applies_to: [document], meaning: Unfinished.}
+- {code: active, applies_to: [document], meaning: Current.}
+- {code: accepted, applies_to: [decision], meaning: Decided.}
+- {code: superseded, applies_to: [decision], meaning: Replaced.}
+- code: proposed
+  applies_to: [document, decision]
+  meaning: Not decided.
+  notice: |-
+    **Proposal, not decided.**
+    Discussed when it is built.
+"""
 
 
-def frontmatter(title: str, order: int, summary: str = "What it covers") -> str:
-    meta = f"title: {title}\nsummary: {summary}\norder: {order}\nstatus: active\nrelated: []"
+def frontmatter(title: str, order: int, summary: str = "What it covers", status: str = "active") -> str:
+    meta = f"title: {title}\nsummary: {summary}\norder: {order}\nstatus: {status}\nrelated: []"
     return f"---\n{meta}\n---\n\n# {title}\n"
 
 
@@ -22,11 +40,15 @@ def decision(number: str, status: str = "accepted") -> str:
 
 
 class Repository:
-    """A throwaway git repository with the given files."""
+    """A throwaway git repository with the given files, next to a handbook with the given statuses."""
 
-    def __init__(self, files: dict[str, str]) -> None:
+    def __init__(self, files: dict[str, str], statuses: str | None = STATUSES) -> None:
         self.directory = tempfile.TemporaryDirectory()
-        self.root = Path(self.directory.name)
+        self.root = Path(self.directory.name) / "repository"
+        self.root.mkdir()
+        if statuses is not None:
+            (Path(self.directory.name) / "handbook" / "data").mkdir(parents=True)
+            (Path(self.directory.name) / "handbook" / "data" / "document-statuses.yaml").write_text(statuses)
         for path, text in files.items():
             (self.root / path).parent.mkdir(parents=True, exist_ok=True)
             (self.root / path).write_text(textwrap.dedent(text))
@@ -34,7 +56,13 @@ class Repository:
 
     def run(self, action: str) -> tuple[int, str]:
         output, errors = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+        # The handbook next to the repository, whatever the environment points to.
+        environment = {key: value for key, value in os.environ.items() if key != HANDBOOK}
+        with (
+            unittest.mock.patch.dict(os.environ, environment, clear=True),
+            contextlib.redirect_stdout(output),
+            contextlib.redirect_stderr(errors),
+        ):
             code = cli.main([action, "--root", str(self.root)])
         return code, output.getvalue() + errors.getvalue()
 
@@ -109,10 +137,86 @@ class RepositoryLayoutTest(unittest.TestCase):
 
     def test_frontmatter_outside_the_schema_fails(self) -> None:
         code, output = self.repository(
-            **{"docs/guide.md": frontmatter("Guide", 1).replace("active", "done")}
+            **{"docs/guide.md": frontmatter("Guide", 1).replace("order: 1", "order: first")}
         ).run("check")
         self.assertEqual(code, 1)
-        self.assertIn("'done' is not one of", output)
+        self.assertIn("docs/guide.md: frontmatter order: 'first' is not of type 'integer'", output)
+
+    def test_a_status_the_handbook_does_not_define_fails(self) -> None:
+        code, output = self.repository(**{"docs/guide.md": frontmatter("Guide", 1, status="done")}).run(
+            "check"
+        )
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "docs/guide.md: status 'done' is not one the handbook defines for a document: "
+            "draft, active, proposed",
+            output,
+        )
+
+    def test_a_status_of_another_kind_fails(self) -> None:
+        code, output = self.repository(**{"docs/adr/0001-first.md": decision("0001", "active")}).run("check")
+        self.assertIn(
+            "status 'active' is not one the handbook defines for a decision: "
+            "accepted, superseded by ADR-NNNN, proposed",
+            output,
+        )
+
+    def test_a_superseded_decision_names_its_successor(self) -> None:
+        repository = self.repository(
+            **{
+                "docs/adr/0001-first.md": decision("0001", "superseded by ADR-0002"),
+                "docs/adr/0002-second.md": decision("0002"),
+            }
+        )
+        code, output = repository.run("generate")
+        self.assertEqual(code, 0, output)
+
+    def test_a_proposal_shows_its_notice_and_is_marked_in_the_indexes(self) -> None:
+        repository = self.repository(
+            **{
+                "docs/design.md": frontmatter("Design", 2, status="proposed") + "\nThe design.\n",
+                "docs/adr/0001-first.md": decision("0001", "proposed"),
+            }
+        )
+        code, output = repository.run("generate")
+        self.assertEqual(code, 0, output)
+        notice = (
+            "<!-- BEGIN GENERATED notice · source: this document's status, in the handbook's statuses"
+            " · edit the source, then run `mise run docs` -->\n"
+            "> **Proposal, not decided.**\n> Discussed when it is built.\n<!-- END GENERATED -->\n"
+        )
+        self.assertIn(f"# Design\n\n{notice}\nThe design.\n", repository.read("docs/design.md"))
+        self.assertIn(f"# ADR\n\n{notice}", repository.read("docs/adr/0001-first.md"))
+        self.assertIn(
+            "| [Design](docs/design.md) | What it covers *(proposed)* |", repository.read("README.md")
+        )
+        self.assertIn("- [Design](docs/design.md): What it covers *(proposed)*", repository.read("llms.txt"))
+        self.assertEqual(repository.run("check")[0], 0)
+
+    def test_a_proposal_without_its_notice_fails_the_check(self) -> None:
+        repository = self.repository(**{"docs/design.md": frontmatter("Design", 2, status="proposed")})
+        repository.run("generate")
+        repository.write("docs/design.md", frontmatter("Design", 2, status="proposed"))
+        code, output = repository.run("check")
+        self.assertEqual(code, 1)
+        self.assertIn("docs/design.md: generated view is out of date", output)
+
+    def test_the_notice_goes_when_the_status_has_none(self) -> None:
+        repository = self.repository(**{"docs/design.md": frontmatter("Design", 2, status="proposed")})
+        repository.run("generate")
+        repository.write("docs/design.md", repository.read("docs/design.md").replace("proposed", "active"))
+        repository.run("generate")
+        self.assertEqual(repository.read("docs/design.md"), frontmatter("Design", 2))
+
+    def test_a_missing_handbook_fails_saying_where_it_was_looked_for(self) -> None:
+        repository = Repository(repository_layout(), statuses=None)
+        self.addCleanup(repository.directory.cleanup)
+        code, output = repository.run("check")
+        self.assertEqual(code, 1)
+        self.assertIn("the handbook's statuses are missing (", output)
+        self.assertIn(
+            "handbook/data/document-statuses.yaml): clone the handbook next to this repository", output
+        )
 
     def test_two_documents_with_the_same_order_fail(self) -> None:
         code, output = self.repository(**{"docs/design.md": frontmatter("Design", 1)}).run("check")
@@ -163,6 +267,19 @@ class ConfigurationTest(unittest.TestCase):
         self.addCleanup(repository.directory.cleanup)
         code, output = repository.run("check")
         self.assertIn("docs.toml: unknown setting 'documentz'", output)
+
+    def test_docs_toml_points_to_the_handbook(self) -> None:
+        files = {
+            "README.md": "# Handbook\n\nWhy.\n",
+            "docs.toml": 'sections = true\ndecisions = "90-decisions"\nhandbook = "."\n',
+            "data/document-statuses.yaml": STATUSES,
+            "00-overview/README.md": frontmatter("Overview", 0, status="proposed"),
+        }
+        repository = Repository(files, statuses=None)
+        self.addCleanup(repository.directory.cleanup)
+        code, output = repository.run("generate")
+        self.assertEqual(code, 0, output)
+        self.assertIn("> **Proposal, not decided.**", repository.read("00-overview/README.md"))
 
     def test_the_sections_layout_needs_a_readme_in_every_section(self) -> None:
         files = {
