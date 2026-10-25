@@ -25,6 +25,15 @@ jobs:
           path: .standards
           persist-credentials: false
 
+      - name: Check out the handbook, which defines the documentation's statuses
+        # Only for documentation, which the handbook's own pull requests check against their own version.
+        if: github.repository != 'ByteLibrary/handbook' && hashFiles('docs.toml', 'llms.txt', 'docs/**') != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ByteLibrary/handbook
+          path: .handbook
+          persist-credentials: false
+
       - name: Install mise and the repository's tools
         uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         env:
@@ -42,5 +51,6 @@ jobs:
       - name: Lint
         env:
           MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+          DOCUMENTATION_HANDBOOK: ${{ github.repository != 'ByteLibrary/handbook' && format('{0}/.handbook', github.workspace) || '' }}
         # On the Python this repository pins, whatever the calling repository uses.
         run: '"$RULES_PYTHON" .standards/scripts/lint.py'

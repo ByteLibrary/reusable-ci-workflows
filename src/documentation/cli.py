@@ -1,8 +1,10 @@
 """Validates a repository's documentation, and generates the views derived from it.
 
 Documents carry frontmatter; views are written between "BEGIN GENERATED <view>" and "END GENERATED"
-markers, and llms.txt is generated whole. The layout is the organization's convention, or what the
-repository's docs.toml overrides. The rules: 40-conventions/documentation.md in the handbook.
+markers, and llms.txt is generated whole. The statuses a document may have, and the notice each shows,
+come from the handbook (data/document-statuses.yaml), by default its clone next to the repository. The
+layout is the organization's convention, or what the repository's docs.toml overrides. The rules:
+40-conventions/documentation.md in the handbook.
 
 Examples:
   documentation generate                  validate, then rewrite every generated view
@@ -15,8 +17,8 @@ import json
 import sys
 from pathlib import Path
 
-from documentation import rules
-from documentation.documents import discover
+from documentation import rules, statuses
+from documentation.documents import Document, Found, discover
 from documentation.extension import Context, load_extension
 from documentation.generate import generated_files
 from documentation.layout import load
@@ -28,21 +30,39 @@ def build(root: Path, report: Report) -> dict[str, str]:
     """Every generated file's new text, after validating; nothing when validation fails."""
     layout = load(root, report)
     found = discover(root, layout, report)
+    table = statuses.load(root, layout, report)
     extension = load_extension(root, layout, report)
+    notices = notices_by_path(found, table)
     context: Context = {
         "root": root,
         "documents": found.documents,
         "decisions": found.decisions,
         "readmes": found.readmes,
+        "notices": notices,
         **extension.load(root, report.error),
     }
     if report.errors:
         return {}
-    rules.check(root, layout, found, report)
+    rules.check(root, layout, found, table, report)
     extension.validate(context, report.error)
     if report.errors:
         return {}
-    return generated_files(root, layout, found, {**VIEWS, **extension.views}, context, report)
+    return generated_files(root, layout, found, {**VIEWS, **extension.views}, context, notices, report)
+
+
+def notices_by_path(found: Found, table: list[statuses.Status]) -> dict[str, str]:
+    """The notice each document and decision shows, for those whose status has one."""
+    notices: dict[str, str] = {}
+    kinds: tuple[tuple[statuses.Kind, list[Document]], ...] = (
+        ("document", found.documents),
+        ("decision", found.decisions),
+    )
+    for kind, items in kinds:
+        for item in items:
+            row = statuses.find(table, kind, str(item.get("status", "")))
+            if row is not None and row.notice:
+                notices[item["path"]] = row.notice
+    return notices
 
 
 def main(argv: list[str] | None = None) -> int:

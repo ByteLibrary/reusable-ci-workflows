@@ -1,13 +1,14 @@
 """The generated views every repository can use, and the helpers a repository's own views build on.
 
 A view is a function called with keyword arguments: `source` (the file it is written into), `folder`
-(the argument after its name in the marker, if any), `root`, `documents`, `decisions`, `readmes`, and
-whatever the repository's extension loads. It returns Markdown.
+(the argument after its name in the marker, if any), `root`, `documents`, `decisions`, `readmes`,
+`notices` (each notice by the path of the document or decision that shows it), and whatever the
+repository's extension loads. It returns Markdown.
 """
 
 import os
 import pathlib
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from documentation.documents import Document, PartReadme
 from documentation.rules import sections
@@ -32,6 +33,13 @@ def by_path(documents: list[Document]) -> dict[str, Document]:
     return {document["path"]: document for document in documents}
 
 
+def summary(document: Document, notices: Mapping[str, str]) -> str:
+    """A document's summary, marked with its status when the status shows a notice, such as a proposal."""
+    if document["path"] in notices:
+        return f"{document['summary']} *({document['status']})*"
+    return document["summary"]
+
+
 def index_entries(documents: list[Document], folder: str) -> list[Document]:
     """Documents directly in a folder, plus the READMEs of its direct subfolders, in reading order."""
     entries: list[Document] = []
@@ -51,20 +59,24 @@ def index_entries(documents: list[Document], folder: str) -> list[Document]:
     )
 
 
-def view_index(source: str, folder: str, documents: list[Document], **_: object) -> str:
+def view_index(
+    source: str, folder: str, documents: list[Document], notices: Mapping[str, str], **_: object
+) -> str:
     rows = [
-        (f"[{document['title']}]({relative(source, document['path'])})", document["summary"])
+        (f"[{document['title']}]({relative(source, document['path'])})", summary(document, notices))
         for document in index_entries(documents, folder)
     ]
     return table(["Document", "Covers"], rows)
 
 
-def view_sections(source: str, root: pathlib.Path, documents: list[Document], **_: object) -> str:
+def view_sections(
+    source: str, root: pathlib.Path, documents: list[Document], notices: Mapping[str, str], **_: object
+) -> str:
     readmes = by_path(documents)
     rows = [
         (
             f"[{section}]({relative(source, section + '/README.md')})",
-            readmes[f"{section}/README.md"]["summary"],
+            summary(readmes[f"{section}/README.md"], notices),
         )
         for section in sections(root)
         if f"{section}/README.md" in readmes
@@ -92,9 +104,15 @@ def view_parts(source: str, readmes: list[PartReadme], **_: object) -> str:
     return table(["Part", "Covers"], rows)
 
 
+def view_notice(source: str, notices: Mapping[str, str], **_: object) -> str:
+    """The notice of the document's or decision's status, as a quote."""
+    return "\n".join(f"> {line}" if line else ">" for line in notices[source].strip().split("\n")) + "\n"
+
+
 VIEWS: Views = {
     "index": (view_index, "the frontmatter of the listed documents"),
     "sections": (view_sections, "the frontmatter of each section's README.md"),
     "adr-index": (view_adr_index, "the frontmatter of each ADR"),
     "parts": (view_parts, "the first heading and paragraph of each part's README.md"),
+    "notice": (view_notice, "this document's status, in the handbook's statuses"),
 }

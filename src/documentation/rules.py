@@ -1,4 +1,5 @@
-"""The rules every repository's documentation follows: frontmatter, order, sections and decisions."""
+"""The rules every repository's documentation follows: frontmatter, statuses, order, sections and
+decisions."""
 
 import json
 import re
@@ -7,9 +8,10 @@ from pathlib import Path, PurePosixPath
 
 import jsonschema
 
-from documentation.documents import SECTION, Found
+from documentation.documents import SECTION, Document, Found
 from documentation.layout import Layout
 from documentation.report import Report
+from documentation.statuses import Kind, Status, allowed, find
 
 
 def schema(kind: str) -> jsonschema.Draft202012Validator:
@@ -29,6 +31,22 @@ def check_frontmatter(found: Found, report: Report) -> None:
             for problem in validator.iter_errors(meta):
                 report.error(
                     f"{item['path']}: frontmatter {'/'.join(map(str, problem.path))}: {problem.message}"
+                )
+
+
+def check_statuses(found: Found, statuses: list[Status], report: Report) -> None:
+    """Every status is one the handbook defines for its kind."""
+    kinds: tuple[tuple[Kind, list[Document]], ...] = (
+        ("document", found.documents),
+        ("decision", found.decisions),
+    )
+    for kind, items in kinds:
+        for item in items:
+            status = str(item.get("status", ""))
+            if find(statuses, kind, status) is None:
+                report.error(
+                    f"{item['path']}: status '{status}' is not one the handbook defines for a {kind}: "
+                    f"{allowed(statuses, kind)}"
                 )
 
 
@@ -65,10 +83,11 @@ def sections(root: Path) -> list[str]:
     return sorted(path.name for path in root.iterdir() if path.is_dir() and SECTION.match(f"{path.name}/"))
 
 
-def check(root: Path, layout: Layout, found: Found, report: Report) -> None:
+def check(root: Path, layout: Layout, found: Found, statuses: list[Status], report: Report) -> None:
     check_frontmatter(found, report)
     if report.errors:
         return
+    check_statuses(found, statuses, report)
     check_order(found, report)
     check_decisions(found, layout, report)
     if layout.sections:
